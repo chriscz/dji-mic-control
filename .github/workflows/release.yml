@@ -176,6 +176,7 @@ jobs:
       - name: Create or update GitHub Release and upload Linux packages
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.prepare.outputs.tag }}
           DRAFT: ${{ needs.prepare.outputs.draft }}
         run: |
@@ -187,14 +188,16 @@ jobs:
             NOTES_ARGS=(--generate-notes)
           fi
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --clobber
+          if gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --repo "$GH_REPO" --clobber
           else
             DRAFT_ARGS=()
             if [ "$DRAFT" = "true" ]; then
               DRAFT_ARGS=(--draft)
             fi
             gh release create "$TAG" dist/* \
+              --repo "$GH_REPO" \
+              --verify-tag \
               --title "$TAG" \
               "${DRAFT_ARGS[@]}" \
               "${NOTES_ARGS[@]}"

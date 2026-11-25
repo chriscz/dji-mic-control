@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=DJI Mic Control
+Comment=Control DJI wireless microphones over USB
+Exec=dji_mic_control
+Icon=dji-mic-control
+Terminal=false
+Categories=AudioVideo;Audio;Utility;
+StartupWMClass=dev.miscai.dji_mic_control

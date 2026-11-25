@@ -1,0 +1,20 @@
+[package]
+name = "dji_mic_usb"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Thin C-ABI cdylib wrapping nusb for cross-platform USB bulk access behind Dart's UsbTransport."
+
+[lib]
+name = "dji_mic_usb"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+nusb = "0.1"
+futures-lite = "2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

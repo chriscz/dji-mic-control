@@ -1,7 +1,7 @@
 name: dji_mic_control
 description: "Desktop controller for DJI wireless microphones built on core Flutter and Dart libraries."
 publish_to: 'none'
-version: 1.0.0+1
+version: 0.1.0+1
 
 environment:
   sdk: ^3.13.5

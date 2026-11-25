@@ -102,12 +102,12 @@ class AppShell extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'A microphone is connected but not accessible. Click to fix USB permissions.',
+                        controller.t('A microphone is connected but not accessible. Click to fix USB permissions.'),
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: colors.text),
                       ),
                     ),
                     Text(
-                      'Setup guide',
+                      controller.t('Setup guide'),
                       style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: colors.warn),
                     ),
                   ],
@@ -274,7 +274,7 @@ class AppShell extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Choose a device from the sidebar to view live telemetry and adjust settings.',
+                  controller.t('Choose a device from the sidebar to view live telemetry and adjust settings.'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13.5, color: colors.textDim),
                 ),
@@ -307,9 +307,11 @@ class AppShell extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                permissionIssue
-                    ? 'A DJI microphone is plugged in, but Linux is blocking non-root access to its USB control interface.'
-                    : 'Connect a supported DJI Mic Mini receiver over USB-C and it will appear automatically.',
+                controller.t(
+                  permissionIssue
+                      ? 'A DJI microphone is plugged in, but Linux is blocking non-root access to its USB control interface.'
+                      : 'Connect a supported DJI Mic Mini receiver over USB-C and it will appear automatically.',
+                ),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13.5, color: colors.textDim),
               ),
@@ -432,13 +434,13 @@ class AppShell extends StatelessWidget {
                                       label: Text(
                                         controller.installingUdev
                                             ? 'Installing...'
-                                            : (hasUdevRule ? 'Reload udev rules' : 'Install udev rule'),
+                                            : controller.t(hasUdevRule ? 'Reload udev rules' : 'Install udev rule'),
                                       ),
                                     ),
                                   OutlinedButton(
                                     key: const Key('show-setup-cta'),
                                     onPressed: () => _openUsbSetup(context),
-                                    child: const Text('Show setup instructions'),
+                                    child: Text(controller.t('Show setup instructions')),
                                   ),
                                 ],
                               ),

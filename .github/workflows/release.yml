@@ -64,9 +64,10 @@ jobs:
 
             ruby scripts/prepare_release.rb --version "$VER" --debug
 
+            git config user.name "Chris Coetzee"
+            git config user.email "chriscz93@gmail.com"
+
             if [ -n "$(git status --porcelain pubspec.yaml CHANGELOG.md)" ]; then
-              git config user.name "Chris Coetzee"
-              git config user.email "chriscz93@gmail.com"
               git add pubspec.yaml CHANGELOG.md
               git commit -m "chore(release): prepare ${TAG}" \
                 -m "Update pubspec.yaml and CHANGELOG.md for ${TAG}." \

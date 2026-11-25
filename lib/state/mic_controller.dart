@@ -10,6 +10,7 @@ import '../platform/capabilities.dart';
 import '../platform/config_store.dart';
 import '../platform/notifier.dart';
 import '../platform/tray_service.dart';
+import '../platform/udev_installer.dart';
 import '../protocol/state.dart';
 import '../transport/device_manager.dart';
 import 'app_services.dart';
@@ -39,6 +40,8 @@ class MicController extends ChangeNotifier {
   String? _selectedId;
   bool _userDeselected = false;
   String? _error;
+  bool _installingUdev = false;
+  UdevInstallResult? _udevInstallResult;
 
   final Map<String, String> _optimistic = <String, String>{};
   final Map<String, Timer> _optimisticTimers = <String, Timer>{};
@@ -66,6 +69,9 @@ class MicController extends ChangeNotifier {
   String? get error => _error;
   bool get isDemo => services.isDemo;
   bool get trayActive => services.tray.isActive;
+  bool get installingUdev => _installingUdev;
+  UdevInstallResult? get udevInstallResult => _udevInstallResult;
+  bool get canInstallUdevInApp => services.udevInstaller.supportedOnPlatform;
 
   bool isPending(String settingId) => _pending.contains(settingId);
   bool isTxPending(int txIndex) => _pendingTx.contains(txIndex);
@@ -136,6 +142,31 @@ class MicController extends ChangeNotifier {
   Future<void> refreshNow() async {
     await services.deviceManager.refresh();
     _refreshSnapshot();
+  }
+
+  Future<UdevInstallResult> installUdevRule() async {
+    if (_installingUdev) {
+      return const UdevInstallResult(
+        status: UdevInstallStatus.failed,
+        message: 'Installation is already in progress.',
+      );
+    }
+    _installingUdev = true;
+    _udevInstallResult = null;
+    _safeNotify();
+
+    try {
+      final result = await services.udevInstaller.install();
+      _udevInstallResult = result;
+      if (result.succeeded) {
+        await recheckCapabilities();
+        await refreshNow();
+      }
+      return result;
+    } finally {
+      _installingUdev = false;
+      _safeNotify();
+    }
   }
 
   void toggleSidebar() {

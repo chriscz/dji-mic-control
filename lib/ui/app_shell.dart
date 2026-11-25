@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../platform/capabilities.dart';
 import '../platform/config_store.dart';
+import '../platform/udev_installer.dart';
 import '../state/mic_controller.dart';
 import 'theme.dart';
 import 'widgets/device_panel.dart';
@@ -61,7 +62,10 @@ class AppShell extends StatelessWidget {
         );
     showDialog<void>(
       context: context,
-      builder: (_) => UsbSetupDialog(usbReport: usbReport),
+      builder: (_) => UsbSetupDialog(
+        controller: controller,
+        usbReport: usbReport,
+      ),
     );
   }
 
@@ -252,50 +256,268 @@ class AppShell extends StatelessWidget {
     bool permissionIssue,
     bool hasDevices,
   ) {
-    final String heading;
-    final String body;
-    if (permissionIssue) {
-      heading = 'Permission needed';
-      body = 'A DJI microphone is plugged in, but USB access is blocked by system permissions.';
-    } else if (hasDevices) {
-      heading = 'No device selected';
-      body = 'Choose a device from the sidebar.';
-    } else {
-      heading = 'No microphone connected';
-      body = 'Connect a supported DJI microphone over USB to get started.';
+    final caps = controller.capabilities;
+    final isLinux = (caps?.osName ?? 'linux') == 'linux';
+    final hasUdevRule = caps?.udevRuleInstalled ?? false;
+    final installResult = controller.udevInstallResult;
+
+    if (hasDevices && !permissionIssue) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  'No device selected',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: colors.text),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Choose a device from the sidebar to view live telemetry and adjust settings.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13.5, color: colors.textDim),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(
-                heading,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: colors.text),
+              Icon(
+                permissionIssue ? Icons.usb_off_rounded : Icons.mic_none_rounded,
+                size: 38,
+                color: permissionIssue ? colors.warn : colors.accent,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
-                body,
+                permissionIssue ? 'Permission needed' : 'No microphone connected',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600, color: colors.text),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                permissionIssue
+                    ? 'A DJI microphone is plugged in, but Linux is blocking non-root access to its USB control interface.'
+                    : 'Connect a supported DJI Mic Mini receiver over USB-C and it will appear automatically.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13.5, color: colors.textDim),
               ),
-              if (permissionIssue) ...<Widget>[
-                const SizedBox(height: 16),
-                FilledButton(
-                  key: const Key('show-setup-cta'),
-                  onPressed: () => _openUsbSetup(context),
-                  child: const Text('Show setup instructions'),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colors.bgPanel,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: colors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Text(
+                      permissionIssue ? 'FIX USB PERMISSIONS' : 'GETTING STARTED',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.7,
+                        color: colors.textFaint,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (!permissionIssue) ...<Widget>[
+                      _GuideStepRow(
+                        number: '1',
+                        text: 'Plug the DJI Mic Mini USB-C receiver into your computer using a data-capable cable.',
+                        colors: colors,
+                      ),
+                      const SizedBox(height: 8),
+                      _GuideStepRow(
+                        number: '2',
+                        text: 'Power on one or both transmitters (DJI Mic Mini or DJI Mic Mini 2) so they link with the receiver.',
+                        colors: colors,
+                      ),
+                      const SizedBox(height: 8),
+                      _GuideStepRow(
+                        number: '3',
+                        text: 'Only USB control Interface 6 is claimed, so your microphone keeps working normally for audio input.',
+                        colors: colors,
+                      ),
+                    ] else ...<Widget>[
+                      Text(
+                        hasUdevRule
+                            ? 'A udev rule file already exists, so unplugging and replugging the receiver (or reloading udev rules below) should unlock access.'
+                            : 'Install the DJI udev rule (/etc/udev/rules.d/60-dji-mic.rules) so your user session can control the receiver without root.',
+                        style: TextStyle(fontSize: 13, color: colors.textDim),
+                      ),
+                    ],
+                    if (isLinux) ...<Widget>[
+                      const SizedBox(height: 14),
+                      if (hasUdevRule && !permissionIssue)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: colors.good.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: colors.good.withValues(alpha: 0.35)),
+                          ),
+                          child: Row(
+                            children: <Widget>[
+                              Icon(Icons.check_circle_outline, size: 16, color: colors.good),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Linux USB permissions (udev rule) are installed and ready.',
+                                  style: TextStyle(fontSize: 12.5, color: colors.text),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colors.warn.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: colors.warn.withValues(alpha: 0.35)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              if (!permissionIssue) ...<Widget>[
+                                Row(
+                                  children: <Widget>[
+                                    Icon(Icons.info_outline, size: 16, color: colors.warn),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'First-time Linux setup recommended',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colors.text),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Linux blocks non-root USB control access until the DJI udev rule is installed. You can install it now before plugging in your receiver.',
+                                  style: TextStyle(fontSize: 12.5, color: colors.textDim),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: <Widget>[
+                                  if (controller.canInstallUdevInApp)
+                                    FilledButton.icon(
+                                      key: const Key('main-install-udev-btn'),
+                                      onPressed: controller.installingUdev ? null : controller.installUdevRule,
+                                      icon: controller.installingUdev
+                                          ? const SizedBox(
+                                              width: 14,
+                                              height: 14,
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            )
+                                          : const Icon(Icons.admin_panel_settings_outlined, size: 16),
+                                      label: Text(
+                                        controller.installingUdev
+                                            ? 'Installing...'
+                                            : (hasUdevRule ? 'Reload udev rules' : 'Install udev rule'),
+                                      ),
+                                    ),
+                                  OutlinedButton(
+                                    key: const Key('show-setup-cta'),
+                                    onPressed: () => _openUsbSetup(context),
+                                    child: const Text('Show setup instructions'),
+                                  ),
+                                ],
+                              ),
+                              if (installResult != null) ...<Widget>[
+                                const SizedBox(height: 8),
+                                Text(
+                                  installResult.message,
+                                  key: const Key('udev-install-feedback'),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: installResult.status == UdevInstallStatus.installed
+                                        ? colors.good
+                                        : colors.textDim,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+              if (controller.hasCapabilityNeedingSetup) ...<Widget>[
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () => _openCapabilities(context),
+                  icon: Icon(Icons.tune_rounded, size: 15, color: colors.textDim),
+                  label: Text(
+                    'Optional desktop features (notifications, tray) have setup tips',
+                    style: TextStyle(fontSize: 12.5, color: colors.textDim),
+                  ),
                 ),
               ],
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _GuideStepRow extends StatelessWidget {
+  const _GuideStepRow({
+    required this.number,
+    required this.text,
+    required this.colors,
+  });
+
+  final String number;
+  final String text;
+  final AppColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Container(
+          width: 20,
+          height: 20,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colors.accentSoft,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            number,
+            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: colors.accent),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(text, style: TextStyle(fontSize: 13, color: colors.textDim)),
+        ),
+      ],
     );
   }
 }

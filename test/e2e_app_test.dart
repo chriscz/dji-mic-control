@@ -6,6 +6,7 @@ import 'package:dji_mic_control/main.dart';
 import 'package:dji_mic_control/platform/capabilities.dart';
 import 'package:dji_mic_control/platform/notifier.dart';
 import 'package:dji_mic_control/platform/tray_service.dart';
+import 'package:dji_mic_control/platform/udev_installer.dart';
 import 'package:dji_mic_control/platform/window_controller.dart';
 import 'package:dji_mic_control/protocol/packet.dart';
 import 'package:dji_mic_control/sim/simulated_dji_mic.dart';
@@ -194,6 +195,48 @@ void main() {
       mic.emitStatusAndLevels();
       await tester.pump(const Duration(milliseconds: 50));
       expect(notifier.sent, hasLength(1));
+
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+      await tester.runAsync(() => services.deviceManager.dispose());
+    });
+
+    testWidgets('shows getting-started guidance and one-click udev installer on empty Linux screen', (tester) async {
+      await setDesktopSurface(tester);
+
+      var ruleInstalled = false;
+      final probe = CapabilitiesProbe(
+        osName: 'linux',
+        commandExists: (_) async => true,
+        fileExists: (path) async => ruleInstalled && path == UdevHelper.rulePath,
+        readFile: (_) async => 'ID=ubuntu\n',
+        dbusTrayAvailable: () async => true,
+        dbusNotifyAvailable: () async => true,
+      );
+      final installer = FakeUdevInstaller(
+        onInstall: () => ruleInstalled = true,
+      );
+      final services = AppServices.simulated(
+        transport: SimulatedUsbTransport(const <SimulatedDjiMic>[]),
+        capabilitiesProbe: probe,
+        udevInstaller: installer,
+        isDemo: false,
+      );
+      final controller = await bootstrap(services, startPolling: false);
+
+      await tester.pumpWidget(DjiMicApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No microphone connected'), findsOneWidget);
+      expect(find.text('GETTING STARTED'), findsOneWidget);
+      expect(find.text('First-time Linux setup recommended'), findsOneWidget);
+      expect(find.byKey(const Key('main-install-udev-btn')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('main-install-udev-btn')));
+      await tester.pumpAndSettle();
+
+      expect(installer.callCount, 1);
+      expect(find.text('Linux USB permissions (udev rule) are installed and ready.'), findsOneWidget);
 
       await tester.pumpWidget(const SizedBox());
       controller.dispose();

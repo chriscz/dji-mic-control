@@ -10,18 +10,21 @@ import 'package:flutter/services.dart';
 import '../../log/app_logger.dart';
 import '../../platform/capabilities.dart';
 import '../../platform/config_store.dart';
+import '../../platform/udev_installer.dart';
 import '../../protocol/settings.dart';
 import '../../state/mic_controller.dart';
 import '../theme.dart';
 import 'setting_controls.dart';
 
-/// Copyable USB permissions / udev / Zadig setup modal.
+/// Copyable USB permissions / udev / Zadig setup modal with one-click Linux installer.
 class UsbSetupDialog extends StatefulWidget {
   const UsbSetupDialog({
     super.key,
+    required this.controller,
     required this.usbReport,
   });
 
+  final MicController controller;
   final CapabilityReport usbReport;
 
   @override
@@ -40,81 +43,150 @@ class _UsbSetupDialogState extends State<UsbSetupDialog> {
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
-    final usbReport = widget.usbReport;
-    return Dialog(
-      backgroundColor: colors.bgPanel,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colors.border),
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 620),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 8, 20),
-          child: Scrollbar(
-            controller: _scrollController,
-            thumbVisibility: true,
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              padding: const EdgeInsets.only(right: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Row(
+    final controller = widget.controller;
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final usbReport = controller.capabilities?.usb ?? widget.usbReport;
+        final installResult = controller.udevInstallResult;
+        final isLinux = (controller.capabilities?.osName ?? 'linux') == 'linux';
+
+        return Dialog(
+          backgroundColor: colors.bgPanel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: colors.border),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 580, maxHeight: 620),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 8, 20),
+              child: Scrollbar(
+                controller: _scrollController,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(right: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      Expanded(
-                        child: Text(
-                          'Enable USB access',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: colors.text),
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              'Enable USB access',
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: colors.text),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close, size: 18, color: colors.textDim),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(usbReport.summary, style: TextStyle(fontSize: 13.5, color: colors.textDim)),
+                      if (isLinux && controller.canInstallUdevInApp) ...<Widget>[
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colors.bgElev,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: colors.border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              Text(
+                                'Automatic install (recommended)',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colors.text),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Uses your desktop administrator prompt (pkexec) to write ${UdevHelper.rulePath} and reload udev rules.',
+                                style: TextStyle(fontSize: 12.5, color: colors.textDim),
+                              ),
+                              const SizedBox(height: 10),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: FilledButton.icon(
+                                  key: const Key('modal-install-udev-btn'),
+                                  onPressed: controller.installingUdev ? null : controller.installUdevRule,
+                                  icon: controller.installingUdev
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.admin_panel_settings_outlined, size: 16),
+                                  label: Text(
+                                    controller.installingUdev ? 'Installing...' : 'Install udev rule',
+                                  ),
+                                ),
+                              ),
+                              if (installResult != null) ...<Widget>[
+                                const SizedBox(height: 8),
+                                Text(
+                                  installResult.message,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: installResult.status == UdevInstallStatus.installed
+                                        ? colors.good
+                                        : colors.warn,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.close, size: 18, color: colors.textDim),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
+                      ],
+                      if (usbReport.steps.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 14),
+                        Text(
+                          'Manual steps',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colors.text),
+                        ),
+                        const SizedBox(height: 6),
+                        for (var i = 0; i < usbReport.steps.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text('${i + 1}. ', style: TextStyle(fontWeight: FontWeight.w600, color: colors.accent)),
+                                Expanded(
+                                  child: Text(usbReport.steps[i], style: TextStyle(fontSize: 13, color: colors.text)),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                      if (usbReport.copyableSnippet != null) ...<Widget>[
+                        const SizedBox(height: 14),
+                        _CopyableCodeBlock(
+                          header: usbReport.snippetHeader ?? 'Rule',
+                          buttonLabel: 'Copy rule',
+                          code: usbReport.copyableSnippet!,
+                        ),
+                      ],
+                      if (usbReport.copyableCommand != null) ...<Widget>[
+                        const SizedBox(height: 12),
+                        _CopyableCodeBlock(
+                          header: 'Shell command',
+                          buttonLabel: 'Copy command',
+                          code: usbReport.copyableCommand!,
+                        ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(usbReport.summary, style: TextStyle(fontSize: 13.5, color: colors.textDim)),
-                  if (usbReport.steps.isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 14),
-                    for (var i = 0; i < usbReport.steps.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text('${i + 1}. ', style: TextStyle(fontWeight: FontWeight.w600, color: colors.accent)),
-                            Expanded(
-                              child: Text(usbReport.steps[i], style: TextStyle(fontSize: 13, color: colors.text)),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                  if (usbReport.copyableSnippet != null) ...<Widget>[
-                    const SizedBox(height: 14),
-                    _CopyableCodeBlock(
-                      header: usbReport.snippetHeader ?? 'Rule',
-                      buttonLabel: 'Copy rule',
-                      code: usbReport.copyableSnippet!,
-                    ),
-                  ],
-                  if (usbReport.copyableCommand != null) ...<Widget>[
-                    const SizedBox(height: 12),
-                    _CopyableCodeBlock(
-                      header: 'Shell command',
-                      buttonLabel: 'Copy command',
-                      code: usbReport.copyableCommand!,
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -297,7 +369,16 @@ class _CapabilitiesDialogState extends State<CapabilitiesDialog> {
                           const SizedBox(height: 8),
                           if (caps != null)
                             for (final cap in caps.all) ...<Widget>[
-                              _CapabilityCard(report: cap),
+                              _CapabilityCard(
+                                report: cap,
+                                showInstallUdevButton: cap.id == 'usb' &&
+                                    caps.osName == 'linux' &&
+                                    controller.canInstallUdevInApp &&
+                                    (!caps.udevRuleInstalled || cap.status == CapabilityStatus.needsSetup),
+                                installingUdev: controller.installingUdev,
+                                udevInstallResult: cap.id == 'usb' ? controller.udevInstallResult : null,
+                                onInstallUdev: controller.installUdevRule,
+                              ),
                               const SizedBox(height: 10),
                             ],
                         ],
@@ -361,9 +442,19 @@ class _PrefToggleRow extends StatelessWidget {
 }
 
 class _CapabilityCard extends StatelessWidget {
-  const _CapabilityCard({required this.report});
+  const _CapabilityCard({
+    required this.report,
+    this.showInstallUdevButton = false,
+    this.installingUdev = false,
+    this.udevInstallResult,
+    this.onInstallUdev,
+  });
 
   final CapabilityReport report;
+  final bool showInstallUdevButton;
+  final bool installingUdev;
+  final UdevInstallResult? udevInstallResult;
+  final VoidCallback? onInstallUdev;
 
   @override
   Widget build(BuildContext context) {
@@ -410,7 +501,36 @@ class _CapabilityCard extends StatelessWidget {
           Text(report.summary, style: TextStyle(fontSize: 12.5, color: colors.textDim)),
           const SizedBox(height: 4),
           Text(report.osHint, style: TextStyle(fontSize: 12, color: colors.textFaint)),
-          if (report.copyableCommand != null && report.status == CapabilityStatus.needsSetup) ...<Widget>[
+          if (showInstallUdevButton) ...<Widget>[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                key: const Key('caps-install-udev-btn'),
+                onPressed: installingUdev ? null : onInstallUdev,
+                icon: installingUdev
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.admin_panel_settings_outlined, size: 16),
+                label: Text(installingUdev ? 'Installing...' : 'Install udev rule'),
+              ),
+            ),
+            if (udevInstallResult != null) ...<Widget>[
+              const SizedBox(height: 6),
+              Text(
+                udevInstallResult!.message,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: udevInstallResult!.succeeded ? colors.good : colors.warn,
+                ),
+              ),
+            ],
+          ],
+          if (report.copyableCommand != null &&
+              (report.status == CapabilityStatus.needsSetup || showInstallUdevButton)) ...<Widget>[
             const SizedBox(height: 8),
             _CopyableCodeBlock(
               header: 'Suggested install / setup command',

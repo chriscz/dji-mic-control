@@ -9,6 +9,7 @@ import '../platform/config_store.dart';
 import '../platform/notifier.dart';
 import '../platform/single_instance.dart';
 import '../platform/tray_service.dart';
+import '../platform/udev_installer.dart';
 import '../platform/window_controller.dart';
 import '../sim/simulated_dji_mic.dart';
 import '../transport/device_manager.dart';
@@ -26,6 +27,7 @@ class AppServices {
     required this.notifier,
     required this.tray,
     required this.windowController,
+    required this.udevInstaller,
     required this.logger,
     this.singleInstance,
     this.isDemo = false,
@@ -38,6 +40,7 @@ class AppServices {
   final DesktopNotifier notifier;
   final TrayService tray;
   final WindowController windowController;
+  final UdevInstaller udevInstaller;
   final AppLogger logger;
   final SingleInstance? singleInstance;
   final bool isDemo;
@@ -55,6 +58,7 @@ class AppServices {
       notifier: ProcessDesktopNotifier(logger: logger),
       tray: DbusTrayService(logger: logger),
       windowController: MethodChannelWindowController(),
+      udevInstaller: UdevInstaller(logger: logger),
       logger: logger,
       singleInstance: SingleInstance(),
       isDemo: false,
@@ -67,6 +71,7 @@ class AppServices {
     DesktopNotifier? notifier,
     TrayService? tray,
     WindowController? windowController,
+    UdevInstaller? udevInstaller,
     DateTime Function()? now,
     bool isDemo = true,
   }) {
@@ -88,6 +93,7 @@ class AppServices {
       notifier: notifier ?? RecordingNotifier(),
       tray: tray ?? NoopTrayService(available: true),
       windowController: windowController ?? NoopWindowController(),
+      udevInstaller: udevInstaller ?? FakeUdevInstaller(),
       logger: logger,
       isDemo: isDemo,
     );

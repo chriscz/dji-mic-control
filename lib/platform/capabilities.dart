@@ -44,6 +44,7 @@ class OsCapabilitiesSnapshot {
   const OsCapabilitiesSnapshot({
     required this.osName,
     this.distroId,
+    required this.udevRuleInstalled,
     required this.usb,
     required this.notifications,
     required this.tray,
@@ -52,6 +53,7 @@ class OsCapabilitiesSnapshot {
 
   final String osName;
   final String? distroId;
+  final bool udevRuleInstalled;
   final CapabilityReport usb;
   final CapabilityReport notifications;
   final CapabilityReport tray;
@@ -113,7 +115,9 @@ class CapabilitiesProbe {
 
   Future<OsCapabilitiesSnapshot> inspect({bool usbPermissionIssue = false}) async {
     final distro = _osName == 'linux' ? await _detectLinuxDistro() : null;
-    final usb = await _inspectUsb(usbPermissionIssue: usbPermissionIssue);
+    final hasRule = _osName == 'linux' &&
+        (await _fileExists(UdevHelper.rulePath) || await _fileExists(UdevHelper.packagedRulePath));
+    final usb = await _inspectUsb(usbPermissionIssue: usbPermissionIssue, hasRule: hasRule);
     final notifications = await _inspectNotifications(distro);
     final tray = await _inspectTray(distro);
     final autostart = _inspectAutostart();
@@ -121,6 +125,7 @@ class CapabilitiesProbe {
     return OsCapabilitiesSnapshot(
       osName: _osName,
       distroId: distro,
+      udevRuleInstalled: hasRule,
       usb: usb,
       notifications: notifications,
       tray: tray,
@@ -143,9 +148,11 @@ class CapabilitiesProbe {
     return id ?? idLike;
   }
 
-  Future<CapabilityReport> _inspectUsb({required bool usbPermissionIssue}) async {
+  Future<CapabilityReport> _inspectUsb({
+    required bool usbPermissionIssue,
+    required bool hasRule,
+  }) async {
     if (_osName == 'linux') {
-      final hasRule = await _fileExists(UdevHelper.rulePath) || await _fileExists(UdevHelper.packagedRulePath);
       final rule = UdevHelper.generateLinuxUdevRule();
       final cmd = UdevHelper.installCommand();
       if (usbPermissionIssue) {

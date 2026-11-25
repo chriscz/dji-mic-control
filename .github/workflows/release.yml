@@ -1,0 +1,200 @@
+# Pure GitHub-native release pipeline (poor-man's release-please).
+#
+# Two ways to publish a version, 100% from GitHub with zero third-party actions:
+#   1. GitHub UI: Actions -> Release -> Run workflow -> enter version (e.g. 0.1.0).
+#      Bumps pubspec.yaml + rolls CHANGELOG.md [Unreleased] via scripts/prepare_release.rb,
+#      commits to main if changed, tags vX.Y.Z, builds all Linux pure-Dart usbfs
+#      packages (.tar.gz, .deb, .rpm, .AppImage, SHA256SUMS.txt), and creates
+#      the GitHub Release (draft by default).
+#   2. Tag push: git tag v0.1.0 && git push origin v0.1.0 (or create a tag from
+#      GitHub Releases UI). Validates pubspec.yaml matches vX.Y.Z, runs tests,
+#      builds all 4 Linux packages, and publishes/uploads assets to the release.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semantic version to release (e.g. 0.1.0, without leading v)"
+        required: true
+        type: string
+      draft:
+        description: "Create as a draft GitHub Release for review before publishing"
+        required: false
+        default: true
+        type: boolean
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.7"
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      ref: ${{ steps.meta.outputs.ref }}
+      draft: ${{ steps.meta.outputs.draft }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Prepare or validate release version and tag
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_DRAFT: ${{ inputs.draft }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VER="${INPUT_VERSION#v}"
+            TAG="v${VER}"
+            DRAFT="${INPUT_DRAFT:-true}"
+
+            ruby scripts/prepare_release.rb --version "$VER" --debug
+
+            if [ -n "$(git status --porcelain pubspec.yaml CHANGELOG.md)" ]; then
+              git config user.name "Chris Coetzee"
+              git config user.email "chriscz93@gmail.com"
+              git add pubspec.yaml CHANGELOG.md
+              git commit -m "chore(release): prepare ${TAG}" \
+                -m "Update pubspec.yaml and CHANGELOG.md for ${TAG}." \
+                -m "Assisted-by-AI-model: github-actions" \
+                -m "Assisted-by-AI-harness: github-actions"
+              git push origin HEAD:main
+            fi
+
+            if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+              echo "Tag ${TAG} already exists; reusing existing tag."
+            else
+              git tag -a "$TAG" -m "Release ${TAG}"
+              git push origin "$TAG"
+            fi
+            REF="$(git rev-parse "${TAG}^{commit}")"
+          else
+            TAG="$GITHUB_REF_NAME"
+            VER="${TAG#v}"
+            DRAFT="false"
+            ruby scripts/prepare_release.rb --check-version "$VER" --debug
+            REF="$(git rev-parse HEAD)"
+          fi
+
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+          echo "draft=${DRAFT}" >> "$GITHUB_OUTPUT"
+
+  package-linux:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run Ruby script tests and em-dash check
+        run: |
+          ruby scripts/check_em_dashes.rb --all
+          for t in scripts/test_*.rb; do ruby "$t"; done
+
+      - name: Install Linux build, test, and packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev xvfb \
+            dpkg-dev rpm file desktop-file-utils xz-utils curl
+
+      - name: Install pinned Flutter SDK (${{ env.FLUTTER_VERSION }})
+        run: |
+          ARCHIVE="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+          curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/${ARCHIVE}" -o "/tmp/${ARCHIVE}"
+          tar -xf "/tmp/${ARCHIVE}" -C "$HOME"
+          rm -f "/tmp/${ARCHIVE}"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+          "$HOME/flutter/bin/flutter" config --no-analytics --enable-linux-desktop
+
+      - name: Run Flutter analyzer, unit tests, and desktop integration test
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          xvfb-run -a flutter test integration_test/app_desktop_test.dart -d linux
+
+      - name: Download appimagetool
+        run: |
+          curl -fsSL "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" \
+            -o /tmp/appimagetool
+          chmod +x /tmp/appimagetool
+
+      - name: Build pure-Dart usbfs release and package tar.gz, deb, rpm, AppImage
+        run: |
+          bash tool/package_linux.sh \
+            --version "${{ needs.prepare.outputs.version }}" \
+            --out-dir dist \
+            --formats tar,deb,rpm,appimage \
+            --appimagetool /tmp/appimagetool
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          if ! ruby scripts/prepare_release.rb --extract-notes "${{ needs.prepare.outputs.version }}" --out dist/release-notes.md; then
+            rm -f dist/release-notes.md
+          fi
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-release-assets
+          path: dist/
+          retention-days: 7
+
+  publish:
+    needs: [prepare, package-linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: linux-release-assets
+          path: dist/
+
+      - name: Create or update GitHub Release and upload Linux packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          DRAFT: ${{ needs.prepare.outputs.draft }}
+        run: |
+          NOTES_ARGS=()
+          if [ -f dist/release-notes.md ]; then
+            mv dist/release-notes.md /tmp/release-notes.md
+            NOTES_ARGS=(--notes-file /tmp/release-notes.md)
+          else
+            NOTES_ARGS=(--generate-notes)
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            DRAFT_ARGS=()
+            if [ "$DRAFT" = "true" ]; then
+              DRAFT_ARGS=(--draft)
+            fi
+            gh release create "$TAG" dist/* \
+              --title "$TAG" \
+              "${DRAFT_ARGS[@]}" \
+              "${NOTES_ARGS[@]}"
+          fi

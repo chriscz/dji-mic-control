@@ -2,7 +2,7 @@
 Type=Application
 Name=DJI Mic Control
 Comment=Control DJI wireless microphones over USB
-Exec=dji_mic_control
+Exec=dji-mic-control
 Icon=dji-mic-control
 Terminal=false
 Categories=AudioVideo;Audio;Utility;

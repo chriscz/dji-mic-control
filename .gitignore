@@ -49,3 +49,6 @@ app.*.map.json
 
 # Native Rust cdylib build artifacts
 /native/*/target/
+
+# Local release packaging output
+/dist/

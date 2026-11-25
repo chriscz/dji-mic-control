@@ -1,0 +1,68 @@
+# Runs static analysis, Ruby hook script suites, Flutter unit/widget tests,
+# Linux GTK3 desktop integration tests (under Xvfb), and a Linux tar/deb
+# packaging smoke check on pushes to main and non-draft pull requests.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.47.7"
+
+jobs:
+  test-and-build:
+    if: ${{ github.event_name == 'push' || (!github.event.pull_request.draft && github.event.action != 'closed') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check em-dashes and Ruby hook/release script tests
+        run: |
+          ruby scripts/check_em_dashes.rb --all
+          for t in scripts/test_*.rb; do
+            echo "==> $t"
+            ruby "$t"
+          done
+
+      - name: Install Linux desktop build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev xvfb dpkg-dev xz-utils curl
+
+      - name: Install pinned Flutter SDK (${{ env.FLUTTER_VERSION }})
+        run: |
+          ARCHIVE="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+          curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/${ARCHIVE}" -o "/tmp/${ARCHIVE}"
+          tar -xf "/tmp/${ARCHIVE}" -C "$HOME"
+          rm -f "/tmp/${ARCHIVE}"
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+          "$HOME/flutter/bin/flutter" config --no-analytics --enable-linux-desktop
+          "$HOME/flutter/bin/flutter" --version
+
+      - name: Analyze and run Flutter unit and widget E2E tests
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Run Linux GTK3 desktop integration test under Xvfb
+        run: xvfb-run -a flutter test integration_test/app_desktop_test.dart -d linux
+
+      - name: Build pure-Dart usbfs release and smoke-test tar.gz and deb packaging
+        run: bash tool/package_linux.sh --out-dir dist --formats tar,deb

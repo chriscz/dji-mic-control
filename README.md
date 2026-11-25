@@ -15,6 +15,11 @@ It also incorporates protocol, UI, and localization work from two upstream pull 
 
 All protocol reverse-engineering, DUML framing, UI layout concepts, and original device PNG artwork originate from **ShadowBitBasher**, and the Mobile Receiver / gain control / Chinese translation additions originate from **VaderCheng**.
 
+### Attribution Approach
+
+- **Human and upstream credit:** Original authors and contributors are credited explicitly in `README.md`, `LICENSE`, `CHANGELOG.md`, and relevant source file headers.
+- **Git commit attribution:** Commits are authored by the human maintainer (`Chris Coetzee`), never by an AI model or `Co-Authored-By` AI trailer. AI-assisted commits end with two kebab-case trailers (`Assisted-by-AI-model` and `Assisted-by-AI-harness`), enforced locally by `lefthook` (`scripts/check_commit_message.rb`). See [AGENTS.md](AGENTS.md) for the full policy.
+
 ## Highlights
 
 - **Core Flutter and Dart standard library only:** Zero third-party pub.dev runtime dependencies and zero hard-linked OS plugin libraries (`libappindicator`, `libnotify`, `libusb`, `webkit2gtk`).
@@ -43,12 +48,18 @@ Headless `flutter test` works immediately with no extra system packages. Buildin
 sudo apt install clang cmake ninja-build libgtk-3-dev xvfb
 ```
 
-Then build and audit shared-library dependencies:
+Then build and package Linux x64 artifacts (pure-Dart `usbfs` default):
 
 ```sh
-bash tool/build_linux.sh --release
-bash tool/build_linux.sh --with-nusb --release   # also compile & bundle libdji_mic_usb.so
+bash tool/package_linux.sh --formats tar,deb,rpm,appimage --out-dir dist
 ```
+
+## Publishing Releases (Pure GitHub Workflow)
+
+Releases run entirely inside GitHub Actions (`.github/workflows/release.yml`) with zero third-party release actions:
+
+1. **One-click from GitHub UI:** Open **Actions -> release -> Run workflow**, enter a version (for example `0.1.0`), and keep **draft** checked to review before publishing. The workflow runs `scripts/prepare_release.rb` to update `pubspec.yaml` and roll `## [Unreleased]` in `CHANGELOG.md`, tags `v0.1.0`, runs all tests, builds `.tar.gz`, `.deb`, `.rpm`, `.AppImage`, and `SHA256SUMS.txt` (pure-Dart `usbfs`), and creates the GitHub Release with notes extracted from `CHANGELOG.md`.
+2. **Tag push:** Pushing a `vX.Y.Z` tag (or creating a tag in GitHub Releases) triggers the same verification, packaging, and upload pipeline.
 
 ## Linux USB Permissions (udev)
 

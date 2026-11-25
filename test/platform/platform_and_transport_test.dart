@@ -22,6 +22,7 @@ void main() {
       final defaults = await store.load();
       expect(defaults.viewMode, ViewMode.compact);
       expect(defaults.closeToTray, isTrue);
+      expect(defaults.showDiagnosticsFold, isTrue);
 
       final updated = defaults.copyWith(
         viewMode: ViewMode.list,

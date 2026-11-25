@@ -43,7 +43,7 @@ class AppConfig {
     this.notifyCriticalBattery = true,
     this.notifyDisconnect = false,
     this.debugLogging = false,
-    this.showDiagnosticsFold = false,
+    this.showDiagnosticsFold = true,
     this.showPendingStrip = true,
     this.locale = 'en',
   });
@@ -56,7 +56,7 @@ class AppConfig {
       notifyCriticalBattery: json['notifyCriticalBattery'] as bool? ?? true,
       notifyDisconnect: json['notifyDisconnect'] as bool? ?? false,
       debugLogging: json['debugLogging'] as bool? ?? false,
-      showDiagnosticsFold: json['showDiagnosticsFold'] as bool? ?? false,
+      showDiagnosticsFold: json['showDiagnosticsFold'] as bool? ?? true,
       showPendingStrip: json['showPendingStrip'] as bool? ?? true,
       locale: (json['locale'] as String?) == 'zh-CN' ? 'zh-CN' : 'en',
     );

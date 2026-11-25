@@ -199,7 +199,7 @@ class _DiagnosticsFoldState extends State<DiagnosticsFold> {
                   if (expanded)
                     Container(
                       key: const Key('diagnostics-fold-body'),
-                      height: 170,
+                      height: 140,
                       padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
                       decoration: BoxDecoration(
                         color: colors.bg,

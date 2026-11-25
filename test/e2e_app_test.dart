@@ -69,18 +69,27 @@ void main() {
       expect(mic.tx[1]!.voiceTone, 'bright');
 
       // Toggle Low Cut switch and verify hardware state.
-      await tester.tap(find.byKey(const Key('setting-switch-low-cut')));
+      final lowCutSwitch = find.byKey(const Key('setting-switch-low-cut'));
+      await tester.ensureVisible(lowCutSwitch);
+      await tester.pumpAndSettle();
+      await tester.tap(lowCutSwitch);
       await tester.pumpAndSettle();
       expect(mic.lowCut, isTrue);
 
       // Switch Audio Channels to Stereo -> hardware disables Safety Track and UI locks it.
-      await tester.tap(find.text('Stereo'));
+      final stereoBtn = find.text('Stereo');
+      await tester.ensureVisible(stereoBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(stereoBtn);
       await tester.pumpAndSettle();
       expect(mic.stereo, isTrue);
       expect(mic.safetyTrack, isFalse);
 
       // Switch to List view and verify inline Plug-Free note appears.
-      await tester.tap(find.text('List'));
+      final listBtn = find.text('List');
+      await tester.ensureVisible(listBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(listBtn);
       await tester.pumpAndSettle();
       expect(find.text('Changing this reboots the receiver.'), findsOneWidget);
 
@@ -92,9 +101,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(controller.sidebarOpen, isTrue);
 
-      // Expand on-screen Diagnostics fold and verify TX / TX OK / Confirmed logs appear.
-      await tester.tap(find.byKey(const Key('diagnostics-btn')));
-      await tester.pumpAndSettle();
+      // On-screen Diagnostics fold is expanded by default and shows TX / TX OK / Confirmed logs.
       expect(find.byKey(const Key('diagnostics-fold-body')), findsOneWidget);
       expect(find.textContaining('TX [E2ERX000000001] low-cut=on'), findsOneWidget);
       expect(find.textContaining('TX OK [E2ERX000000001] low-cut=on'), findsOneWidget);
@@ -102,6 +109,9 @@ void main() {
       await tester.tap(find.byKey(const Key('diagnostics-fold-header')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('diagnostics-fold-body')), findsNothing);
+      await tester.tap(find.byKey(const Key('diagnostics-btn')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('diagnostics-fold-body')), findsOneWidget);
 
       // Deselect device by clicking empty sidebar space -> placeholder shows.
       controller.selectDevice(null);
@@ -234,9 +244,12 @@ void main() {
       expect(find.text('No microphone connected'), findsOneWidget);
       expect(find.text('GETTING STARTED'), findsOneWidget);
       expect(find.text('First-time Linux setup recommended'), findsOneWidget);
-      expect(find.byKey(const Key('main-install-udev-btn')), findsOneWidget);
+      final installBtn = find.byKey(const Key('main-install-udev-btn'));
+      expect(installBtn, findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('main-install-udev-btn')));
+      await tester.ensureVisible(installBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(installBtn);
       await tester.pumpAndSettle();
 
       expect(installer.callCount, 1);

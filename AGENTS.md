@@ -62,10 +62,11 @@ Enforced by `scripts/check_commit_message.rb` (commit-msg hook).
 
 ### Commit Attribution Approach
 
+- AI tools are tools driven by human instruction, not authors or co-authors.
 - Author every commit as the repo owner: `Chris Coetzee <chriscz93@gmail.com>`.
-- Never credit Claude or any AI model/tool as author or `Co-Authored-By` (human co-authors are fine).
-- Set local identity first (`git config --local user.name` and `git config --local user.email`). PreToolUse hook `scripts/check_claude_identity.rb` (`.claude/settings.json` and `.agents/hooks.json`) blocks commits under Claude's identity or with AI `Co-Authored-By` trailers.
-- End every AI-assisted commit with two kebab-case trailers naming the assisting model and harness:
+- Reserve `Co-Authored-By` trailers for human co-authors only; do not list AI models or tools as author or `Co-Authored-By`.
+- Set local identity first (`git config --local user.name` and `git config --local user.email`). PreToolUse hook `scripts/check_claude_identity.rb` (`.claude/settings.json` and `.agents/hooks.json`) prevents committing under an AI identity or adding an AI `Co-Authored-By` trailer.
+- Transparently record AI tool assistance at the end of each commit with two kebab-case trailers:
   - `Assisted-by-AI-model: <kebab-case-model>`
   - `Assisted-by-AI-harness: <kebab-case-harness>`
 

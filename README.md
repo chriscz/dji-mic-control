@@ -22,7 +22,7 @@ All protocol reverse-engineering, DUML framing, UI layout concepts, and original
 ### Attribution Approach
 
 - **Human and upstream credit:** Original authors and contributors are credited explicitly in `README.md`, `LICENSE`, `CHANGELOG.md`, and relevant source file headers.
-- **Git commit attribution:** Commits are authored by the human maintainer (`Chris Coetzee`), never by an AI model or `Co-Authored-By` AI trailer. AI-assisted commits end with two kebab-case trailers (`Assisted-by-AI-model` and `Assisted-by-AI-harness`), enforced locally by `lefthook` (`scripts/check_commit_message.rb`). See [AGENTS.md](AGENTS.md) for the full policy.
+- **Git commit attribution:** AI tools are used under human direction to assist with development, not as authors or co-authors. Git authorship and `Co-Authored-By` trailers are reserved for humans, and AI tooling is transparently disclosed via `Assisted-by-AI-model` and `Assisted-by-AI-harness` commit trailers (enforced locally by `lefthook` via `scripts/check_commit_message.rb`). See [AGENTS.md](AGENTS.md) for details.
 
 ## Highlights
 

@@ -92,12 +92,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(controller.sidebarOpen, isTrue);
 
-      // Open Diagnostics dialog and verify entries render.
+      // Expand on-screen Diagnostics fold and verify TX / TX OK / Confirmed logs appear.
       await tester.tap(find.byKey(const Key('diagnostics-btn')));
       await tester.pumpAndSettle();
-      expect(find.text('Diagnostics'), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.close).last);
+      expect(find.byKey(const Key('diagnostics-fold-body')), findsOneWidget);
+      expect(find.textContaining('TX [E2ERX000000001] low-cut=on'), findsOneWidget);
+      expect(find.textContaining('TX OK [E2ERX000000001] low-cut=on'), findsOneWidget);
+      expect(find.textContaining('Confirmed low-cut=on'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('diagnostics-fold-header')));
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('diagnostics-fold-body')), findsNothing);
 
       // Deselect device by clicking empty sidebar space -> placeholder shows.
       controller.selectDevice(null);

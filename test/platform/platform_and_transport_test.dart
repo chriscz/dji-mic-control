@@ -165,6 +165,9 @@ void main() {
     });
 
     test('usbfs ABI constants match x86_64 kernel headers', () {
+      expect(LinuxUsbfsAbi.sizeofBulkTransfer, 24);
+      expect(LinuxUsbfsAbi.bulkDataOffset, 16);
+      expect(LinuxUsbfsAbi.ioctlBulk, 0xc0185502);
       expect(LinuxUsbfsAbi.sizeofDisconnectClaim, 264);
       expect(LinuxUsbfsAbi.sizeofUrb, 56);
       expect(LinuxUsbfsAbi.sizeofPollFd, 8);

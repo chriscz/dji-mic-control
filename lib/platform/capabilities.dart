@@ -85,7 +85,7 @@ class UdevHelper {
 
   static String installCommand() {
     final rule = generateLinuxUdevRule().trimRight();
-    return "printf '%s\\n' '$rule' | sudo tee $rulePath >/dev/null && sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=usb";
+    return "printf '%s\\n' '$rule' | sudo tee $rulePath >/dev/null && sudo udevadm control --reload-rules && sudo udevadm trigger --action=add --subsystem-match=usb --attr-match=idVendor=2ca3";
   }
 }
 

@@ -348,8 +348,15 @@ class _CapabilitiesDialogState extends State<CapabilitiesDialog> {
                                 ),
                                 const SizedBox(height: 10),
                                 _PrefToggleRow(
+                                  label: 'Show pending operations strip',
+                                  subtitle: 'Displays active USB commands above the Diagnostics fold',
+                                  value: cfg.showPendingStrip,
+                                  onChanged: () => controller.setShowPendingStrip(!cfg.showPendingStrip),
+                                ),
+                                const SizedBox(height: 10),
+                                _PrefToggleRow(
                                   label: 'Debug protocol logging',
-                                  subtitle: 'Logs outgoing commands into Diagnostics',
+                                  subtitle: 'Includes raw DUML hex frames in Diagnostics',
                                   value: cfg.debugLogging,
                                   onChanged: () => controller.setDebugLogging(!cfg.debugLogging),
                                 ),

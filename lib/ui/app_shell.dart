@@ -10,6 +10,7 @@ import '../platform/udev_installer.dart';
 import '../state/mic_controller.dart';
 import 'theme.dart';
 import 'widgets/device_panel.dart';
+import 'widgets/diagnostics_fold.dart';
 import 'widgets/modals.dart';
 import 'widgets/sidebar.dart';
 
@@ -73,16 +74,6 @@ class AppShell extends StatelessWidget {
     showDialog<void>(
       context: context,
       builder: (_) => CapabilitiesDialog(controller: controller),
-    );
-  }
-
-  void _openDiagnostics(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => DiagnosticsDialog(
-        logger: controller.services.logger,
-        backendName: controller.snapshot.backendName,
-      ),
     );
   }
 
@@ -178,6 +169,7 @@ class AppShell extends StatelessWidget {
               ],
             ),
           ),
+          DiagnosticsFold(controller: controller),
         ],
       ),
     );
@@ -216,11 +208,15 @@ class AppShell extends StatelessWidget {
           const Spacer(),
           IconButton(
             key: const Key('diagnostics-btn'),
-            tooltip: 'Diagnostics log',
-            icon: Icon(Icons.terminal_rounded, size: 17, color: colors.textDim),
+            tooltip: controller.config.showDiagnosticsFold ? 'Collapse diagnostics' : 'Expand diagnostics',
+            icon: Icon(
+              Icons.terminal_rounded,
+              size: 17,
+              color: controller.config.showDiagnosticsFold ? colors.accent : colors.textDim,
+            ),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints.tightFor(width: 28, height: 28),
-            onPressed: () => _openDiagnostics(context),
+            onPressed: controller.toggleDiagnosticsFold,
           ),
           const SizedBox(width: 2),
           Stack(

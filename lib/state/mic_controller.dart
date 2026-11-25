@@ -15,6 +15,23 @@ import '../protocol/state.dart';
 import '../transport/device_manager.dart';
 import 'app_services.dart';
 
+/// Describes an in-flight USB command or confirmation wait shown in the UI.
+class PendingOperation {
+  const PendingOperation({
+    required this.key,
+    required this.label,
+    required this.value,
+    required this.stage,
+    required this.startedAt,
+  });
+
+  final String key;
+  final String label;
+  final String value;
+  final String stage;
+  final DateTime startedAt;
+}
+
 /// Single source of truth for UI state, optimistic writes, OS probing, and alerts.
 class MicController extends ChangeNotifier {
   MicController(
@@ -50,6 +67,7 @@ class MicController extends ChangeNotifier {
   final Map<int, String> _optimisticVoiceTone = <int, String>{};
   final Map<int, Timer> _optimisticTxTimers = <int, Timer>{};
   final Set<int> _pendingTx = <int>{};
+  final Map<String, PendingOperation> _pendingOps = <String, PendingOperation>{};
 
   // Alert deduplication state.
   final Map<String, int> _lastAlertedBatteryTier = <String, int>{};
@@ -72,6 +90,7 @@ class MicController extends ChangeNotifier {
   bool get installingUdev => _installingUdev;
   UdevInstallResult? get udevInstallResult => _udevInstallResult;
   bool get canInstallUdevInApp => services.udevInstaller.supportedOnPlatform;
+  List<PendingOperation> get pendingOperations => List<PendingOperation>.unmodifiable(_pendingOps.values);
 
   bool isPending(String settingId) => _pending.contains(settingId);
   bool isTxPending(int txIndex) => _pendingTx.contains(txIndex);
@@ -231,6 +250,27 @@ class MicController extends ChangeNotifier {
     _safeNotify();
   }
 
+  Future<void> toggleDiagnosticsFold() async {
+    _config = _config.copyWith(showDiagnosticsFold: !_config.showDiagnosticsFold);
+    await services.configStore.save(_config);
+    _safeNotify();
+  }
+
+  Future<void> setShowPendingStrip(bool visible) async {
+    if (_config.showPendingStrip == visible) return;
+    _config = _config.copyWith(showPendingStrip: visible);
+    await services.configStore.save(_config);
+    _safeNotify();
+  }
+
+  Future<void> setLocale(String locale) async {
+    final normalized = locale == 'zh-CN' ? 'zh-CN' : 'en';
+    if (_config.locale == normalized) return;
+    _config = _config.copyWith(locale: normalized);
+    await services.configStore.save(_config);
+    _safeNotify();
+  }
+
   Future<void> setAutostart(bool enabled) async {
     try {
       await services.autostart.setEnabled(enabled);
@@ -245,17 +285,33 @@ class MicController extends ChangeNotifier {
   Future<void> minimizeWindow() => services.windowController.minimize();
   Future<void> showWindow() => services.windowController.show();
 
+  String _labelForSetting(String settingId) {
+    for (final s in _snapshot.settings) {
+      if (s.id == settingId) return s.label;
+    }
+    return settingId;
+  }
+
   Future<void> setSetting(String settingId, String value) async {
     final devId = _selectedId;
     if (devId == null || _pending.contains(settingId)) return;
 
     _error = null;
     _pending.add(settingId);
+    final label = _labelForSetting(settingId);
+    _pendingOps[settingId] = PendingOperation(
+      key: settingId,
+      label: label,
+      value: value,
+      stage: 'Sending',
+      startedAt: _now(),
+    );
     _optimistic[settingId] = value;
     _optimisticTimers.remove(settingId)?.cancel();
     _optimisticTimers[settingId] = Timer(optimisticTimeout, () {
       _optimistic.remove(settingId);
       _optimisticTimers.remove(settingId);
+      _pendingOps.remove(settingId);
       _safeNotify();
     });
 
@@ -266,9 +322,19 @@ class MicController extends ChangeNotifier {
 
     try {
       await services.deviceManager.setSetting(devId, settingId, value);
+      if (_optimistic.containsKey(settingId)) {
+        _pendingOps[settingId] = PendingOperation(
+          key: settingId,
+          label: label,
+          value: value,
+          stage: 'Waiting for confirm',
+          startedAt: _now(),
+        );
+      }
     } catch (e) {
       _optimistic.remove(settingId);
       _optimisticTimers.remove(settingId)?.cancel();
+      _pendingOps.remove(settingId);
       _error = e.toString();
       services.logger.error('Failed to set $settingId=$value: $e');
     } finally {
@@ -281,14 +347,23 @@ class MicController extends ChangeNotifier {
     final devId = _selectedId;
     if (devId == null || _pendingTx.contains(txIndex)) return;
 
+    final opKey = 'tx$txIndex:$settingId';
     _error = null;
     _pendingTx.add(txIndex);
+    _pendingOps[opKey] = PendingOperation(
+      key: opKey,
+      label: 'TX${txIndex + 1} ${_labelForSetting(settingId)}',
+      value: value,
+      stage: 'Sending',
+      startedAt: _now(),
+    );
     if (settingId == 'voice-tone') {
       _optimisticVoiceTone[txIndex] = value;
       _optimisticTxTimers.remove(txIndex)?.cancel();
       _optimisticTxTimers[txIndex] = Timer(optimisticTimeout, () {
         _optimisticVoiceTone.remove(txIndex);
         _optimisticTxTimers.remove(txIndex);
+        _pendingOps.remove(opKey);
         _safeNotify();
       });
     }
@@ -296,9 +371,19 @@ class MicController extends ChangeNotifier {
 
     try {
       await services.deviceManager.setTxSetting(devId, txIndex, settingId, value);
+      if (_optimisticVoiceTone.containsKey(txIndex)) {
+        _pendingOps[opKey] = PendingOperation(
+          key: opKey,
+          label: 'TX${txIndex + 1} ${_labelForSetting(settingId)}',
+          value: value,
+          stage: 'Waiting for confirm',
+          startedAt: _now(),
+        );
+      }
     } catch (e) {
       _optimisticVoiceTone.remove(txIndex);
       _optimisticTxTimers.remove(txIndex)?.cancel();
+      _pendingOps.remove(opKey);
       _error = e.toString();
       services.logger.error('Failed to set TX${txIndex + 1} $settingId=$value: $e');
     } finally {
@@ -345,6 +430,8 @@ class MicController extends ChangeNotifier {
     for (final k in doneKeys) {
       _optimistic.remove(k);
       _optimisticTimers.remove(k)?.cancel();
+      _pendingOps.remove(k);
+      services.logger.info('Confirmed $k=${confirmed[k]}');
     }
 
     final doneTx = <int>[];
@@ -356,6 +443,8 @@ class MicController extends ChangeNotifier {
     for (final idx in doneTx) {
       _optimisticVoiceTone.remove(idx);
       _optimisticTxTimers.remove(idx)?.cancel();
+      _pendingOps.remove('tx$idx:voice-tone');
+      services.logger.info('Confirmed TX${idx + 1} voice-tone=${status.tx[idx]?.voiceTone}');
     }
   }
 
@@ -440,6 +529,7 @@ class MicController extends ChangeNotifier {
     }
     _optimisticTxTimers.clear();
     _optimisticVoiceTone.clear();
+    _pendingOps.clear();
   }
 
   void _safeNotify() {

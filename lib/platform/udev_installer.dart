@@ -68,7 +68,7 @@ class UdevInstaller {
         "printf '%s\\n' '$escapedRule' > ${UdevHelper.rulePath} && "
         'chmod 644 ${UdevHelper.rulePath} && '
         'udevadm control --reload-rules && '
-        'udevadm trigger --subsystem-match=usb';
+        'udevadm trigger --action=add --subsystem-match=usb --attr-match=idVendor=2ca3';
 
     try {
       logger?.info('Running pkexec to install ${UdevHelper.rulePath}');

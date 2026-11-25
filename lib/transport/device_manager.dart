@@ -110,6 +110,7 @@ class DeviceManager {
   final AppLogger? logger;
 
   final Map<String, _TrackedDevice> _devices = <String, _TrackedDevice>{};
+  final Set<String> _loggedPermissionDeniedIds = <String>{};
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
   BusProbe _probe = const BusProbe();
@@ -167,11 +168,14 @@ class DeviceManager {
           final tracked = _TrackedDevice(info: info, model: model, handle: handle);
           _attachStream(devId, tracked);
           _devices[devId] = tracked;
+          _loggedPermissionDeniedIds.remove(devId);
           logger?.info('Opened ${model.name} ($devId) via ${transport.backendName}');
         } on UsbPermissionException catch (e) {
           inaccessibleCount++;
           permissionIssue = true;
-          logger?.warn('Permission denied for $devId: ${e.message}');
+          if (_loggedPermissionDeniedIds.add(devId)) {
+            logger?.warn('Permission denied for $devId: ${e.message}');
+          }
         } catch (e) {
           inaccessibleCount++;
           logger?.warn('Failed to open $devId: $e');
@@ -189,6 +193,9 @@ class DeviceManager {
           logger?.info('Device detached: $id');
         }
       }
+
+      // Prune permission-denied dedup entries for devices no longer on the bus.
+      _loggedPermissionDeniedIds.removeWhere((id) => !seenIds.contains(id));
 
       _probe = BusProbe(
         matchedCount: matchedCount,
@@ -327,8 +334,21 @@ class DeviceManager {
       );
     }
 
-    logger?.debug('TX [$deviceId] $settingId=$value${tx != null ? ' (tx=${tx + 1})' : ''} seq=$seq');
-    await tracked.handle.bulkOut(packet);
+    final hex = packet.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    final txTag = tx != null ? ' (TX${tx + 1})' : '';
+    logger?.info('TX [$deviceId] $settingId=$value$txTag (seq=$seq, ${packet.length}B)');
+    logger?.debug('TX bytes: $hex');
+
+    final sw = Stopwatch()..start();
+    try {
+      await tracked.handle.bulkOut(packet);
+      sw.stop();
+      logger?.info('TX OK [$deviceId] $settingId=$value$txTag (${sw.elapsedMilliseconds}ms)');
+    } catch (e) {
+      sw.stop();
+      logger?.error('TX FAIL [$deviceId] $settingId=$value$txTag after ${sw.elapsedMilliseconds}ms: $e');
+      rethrow;
+    }
   }
 
   void _notify() {

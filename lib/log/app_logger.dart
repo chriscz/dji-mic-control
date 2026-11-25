@@ -5,6 +5,8 @@
 import 'dart:collection';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 /// Log severity levels for the in-app Diagnostics view and optional log file.
 enum LogLevel {
   debug('DEBUG'),
@@ -31,7 +33,7 @@ class LogEntry {
 }
 
 /// Lightweight ring-buffer logger with optional file persistence (pure dart:io).
-class AppLogger {
+class AppLogger extends ChangeNotifier {
   AppLogger({
     this.maxEntries = 400,
     this.logFile,
@@ -57,7 +59,10 @@ class AppLogger {
   void warn(String message) => _record(LogLevel.warn, message);
   void error(String message) => _record(LogLevel.error, message);
 
-  void clear() => _entries.clear();
+  void clear() {
+    _entries.clear();
+    notifyListeners();
+  }
 
   String dumpText() => _entries.map((e) => e.format()).join('\n');
 
@@ -67,6 +72,7 @@ class AppLogger {
     while (_entries.length > maxEntries) {
       _entries.removeFirst();
     }
+    notifyListeners();
     final file = logFile;
     if (file != null) {
       try {

@@ -43,6 +43,9 @@ class AppConfig {
     this.notifyCriticalBattery = true,
     this.notifyDisconnect = false,
     this.debugLogging = false,
+    this.showDiagnosticsFold = false,
+    this.showPendingStrip = true,
+    this.locale = 'en',
   });
 
   factory AppConfig.fromJson(Map<String, dynamic> json) {
@@ -53,6 +56,9 @@ class AppConfig {
       notifyCriticalBattery: json['notifyCriticalBattery'] as bool? ?? true,
       notifyDisconnect: json['notifyDisconnect'] as bool? ?? false,
       debugLogging: json['debugLogging'] as bool? ?? false,
+      showDiagnosticsFold: json['showDiagnosticsFold'] as bool? ?? false,
+      showPendingStrip: json['showPendingStrip'] as bool? ?? true,
+      locale: (json['locale'] as String?) == 'zh-CN' ? 'zh-CN' : 'en',
     );
   }
 
@@ -62,6 +68,9 @@ class AppConfig {
   final bool notifyCriticalBattery;
   final bool notifyDisconnect;
   final bool debugLogging;
+  final bool showDiagnosticsFold;
+  final bool showPendingStrip;
+  final String locale;
 
   AppConfig copyWith({
     ViewMode? viewMode,
@@ -70,6 +79,9 @@ class AppConfig {
     bool? notifyCriticalBattery,
     bool? notifyDisconnect,
     bool? debugLogging,
+    bool? showDiagnosticsFold,
+    bool? showPendingStrip,
+    String? locale,
   }) {
     return AppConfig(
       viewMode: viewMode ?? this.viewMode,
@@ -78,6 +90,9 @@ class AppConfig {
       notifyCriticalBattery: notifyCriticalBattery ?? this.notifyCriticalBattery,
       notifyDisconnect: notifyDisconnect ?? this.notifyDisconnect,
       debugLogging: debugLogging ?? this.debugLogging,
+      showDiagnosticsFold: showDiagnosticsFold ?? this.showDiagnosticsFold,
+      showPendingStrip: showPendingStrip ?? this.showPendingStrip,
+      locale: locale ?? this.locale,
     );
   }
 
@@ -88,6 +103,9 @@ class AppConfig {
         'notifyCriticalBattery': notifyCriticalBattery,
         'notifyDisconnect': notifyDisconnect,
         'debugLogging': debugLogging,
+        'showDiagnosticsFold': showDiagnosticsFold,
+        'showPendingStrip': showPendingStrip,
+        'locale': locale,
       };
 }
 

@@ -83,10 +83,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Changing this reboots the receiver.'), findsOneWidget);
 
-      // Minimize toolbar button invokes WindowController.minimize().
-      await tester.tap(find.byKey(const Key('minimize-btn')));
-      await tester.pump();
-      expect(win.minimized, isTrue);
+      // Collapse and re-expand sidebar via inline toggle buttons.
+      await tester.tap(find.byKey(const Key('sidebar-toggle-btn')));
+      await tester.pumpAndSettle();
+      expect(controller.sidebarOpen, isFalse);
+      await tester.tap(find.byKey(const Key('sidebar-expand-btn')));
+      await tester.pumpAndSettle();
+      expect(controller.sidebarOpen, isTrue);
 
       // Open Diagnostics dialog and verify entries render.
       await tester.tap(find.byKey(const Key('diagnostics-btn')));
@@ -146,10 +149,12 @@ void main() {
       await tester.tap(find.byIcon(Icons.close).last);
       await tester.pumpAndSettle();
 
-      // Open System & Capabilities modal and verify OS-specific install suggestions.
+      // Open System & Capabilities modal and verify OS-specific install suggestions
+      // plus dedicated scrollbar gutter so controls never overlap the scrollbar.
       await tester.tap(find.byKey(const Key('capabilities-btn')));
       await tester.pumpAndSettle();
       expect(find.text('System & Capabilities'), findsOneWidget);
+      expect(find.byKey(const Key('capabilities-scrollbar')), findsOneWidget);
       expect(find.textContaining('apt install libnotify-bin'), findsOneWidget);
       expect(find.textContaining('AppIndicator'), findsWidgets);
 

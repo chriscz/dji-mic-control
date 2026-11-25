@@ -17,12 +17,14 @@ class DeviceSidebar extends StatelessWidget {
     required this.devices,
     required this.selectedId,
     required this.onSelect,
+    required this.onToggle,
   });
 
   final bool open;
   final List<DeviceSummary> devices;
   final String? selectedId;
   final ValueChanged<String?> onSelect;
+  final VoidCallback onToggle;
 
   static const double sidebarWidth = 260;
 
@@ -51,15 +53,29 @@ class DeviceSidebar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                    child: Text(
-                      'DEVICES',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.7,
-                        color: colors.textFaint,
-                      ),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 8, 8),
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            'DEVICES',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.7,
+                              color: colors.textFaint,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          key: const Key('sidebar-toggle-btn'),
+                          tooltip: 'Hide sidebar',
+                          icon: Icon(Icons.chevron_left_rounded, size: 18, color: colors.textDim),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(width: 26, height: 26),
+                          onPressed: onToggle,
+                        ),
+                      ],
                     ),
                   ),
                   if (devices.isEmpty)

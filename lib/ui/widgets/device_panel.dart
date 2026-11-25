@@ -66,7 +66,7 @@ class DevicePanel extends StatelessWidget {
     final viewMode = controller.config.viewMode;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(26, 22, 26, 40),
+      padding: const EdgeInsets.fromLTRB(26, 10, 26, 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[

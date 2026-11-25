@@ -16,7 +16,7 @@ import '../theme.dart';
 import 'setting_controls.dart';
 
 /// Copyable USB permissions / udev / Zadig setup modal.
-class UsbSetupDialog extends StatelessWidget {
+class UsbSetupDialog extends StatefulWidget {
   const UsbSetupDialog({
     super.key,
     required this.usbReport,
@@ -25,8 +25,22 @@ class UsbSetupDialog extends StatelessWidget {
   final CapabilityReport usbReport;
 
   @override
+  State<UsbSetupDialog> createState() => _UsbSetupDialogState();
+}
+
+class _UsbSetupDialogState extends State<UsbSetupDialog> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
+    final usbReport = widget.usbReport;
     return Dialog(
       backgroundColor: colors.bgPanel,
       shape: RoundedRectangleBorder(
@@ -36,61 +50,67 @@ class UsbSetupDialog extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 580, maxHeight: 620),
         child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        'Enable USB access',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: colors.text),
+          padding: const EdgeInsets.fromLTRB(20, 20, 8, 20),
+          child: Scrollbar(
+            controller: _scrollController,
+            thumbVisibility: true,
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.only(right: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          'Enable USB access',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: colors.text),
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close, size: 18, color: colors.textDim),
-                      onPressed: () => Navigator.of(context).pop(),
+                      IconButton(
+                        icon: Icon(Icons.close, size: 18, color: colors.textDim),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(usbReport.summary, style: TextStyle(fontSize: 13.5, color: colors.textDim)),
+                  if (usbReport.steps.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 14),
+                    for (var i = 0; i < usbReport.steps.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text('${i + 1}. ', style: TextStyle(fontWeight: FontWeight.w600, color: colors.accent)),
+                            Expanded(
+                              child: Text(usbReport.steps[i], style: TextStyle(fontSize: 13, color: colors.text)),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                  if (usbReport.copyableSnippet != null) ...<Widget>[
+                    const SizedBox(height: 14),
+                    _CopyableCodeBlock(
+                      header: usbReport.snippetHeader ?? 'Rule',
+                      buttonLabel: 'Copy rule',
+                      code: usbReport.copyableSnippet!,
                     ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                Text(usbReport.summary, style: TextStyle(fontSize: 13.5, color: colors.textDim)),
-                if (usbReport.steps.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 14),
-                  for (var i = 0; i < usbReport.steps.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text('${i + 1}. ', style: TextStyle(fontWeight: FontWeight.w600, color: colors.accent)),
-                          Expanded(
-                            child: Text(usbReport.steps[i], style: TextStyle(fontSize: 13, color: colors.text)),
-                          ),
-                        ],
-                      ),
+                  if (usbReport.copyableCommand != null) ...<Widget>[
+                    const SizedBox(height: 12),
+                    _CopyableCodeBlock(
+                      header: 'Shell command',
+                      buttonLabel: 'Copy command',
+                      code: usbReport.copyableCommand!,
                     ),
+                  ],
                 ],
-                if (usbReport.copyableSnippet != null) ...<Widget>[
-                  const SizedBox(height: 14),
-                  _CopyableCodeBlock(
-                    header: usbReport.snippetHeader ?? 'Rule',
-                    buttonLabel: 'Copy rule',
-                    code: usbReport.copyableSnippet!,
-                  ),
-                ],
-                if (usbReport.copyableCommand != null) ...<Widget>[
-                  const SizedBox(height: 12),
-                  _CopyableCodeBlock(
-                    header: 'Shell command',
-                    buttonLabel: 'Copy command',
-                    code: usbReport.copyableCommand!,
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ),
@@ -101,7 +121,7 @@ class UsbSetupDialog extends StatelessWidget {
 
 /// System & Capabilities dialog showing live OS probing, install suggestions,
 /// and desktop preferences (theme, notifications, tray, autostart).
-class CapabilitiesDialog extends StatelessWidget {
+class CapabilitiesDialog extends StatefulWidget {
   const CapabilitiesDialog({
     super.key,
     required this.controller,
@@ -110,8 +130,22 @@ class CapabilitiesDialog extends StatelessWidget {
   final MicController controller;
 
   @override
+  State<CapabilitiesDialog> createState() => _CapabilitiesDialogState();
+}
+
+class _CapabilitiesDialogState extends State<CapabilitiesDialog> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
+    final controller = widget.controller;
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -125,46 +159,55 @@ class CapabilitiesDialog extends StatelessWidget {
             side: BorderSide(color: colors.border),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640, maxHeight: 680),
+            constraints: const BoxConstraints(maxWidth: 660, maxHeight: 680),
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 20, 8, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              'System & Capabilities',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: colors.text),
-                            ),
-                            Text(
-                              'OS: ${caps?.osName ?? 'unknown'}${caps?.distroId != null ? ' (${caps!.distroId})' : ''}  |  Backend: ${controller.snapshot.backendName}',
-                              style: TextStyle(fontSize: 12, color: colors.textDim),
-                            ),
-                          ],
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                'System & Capabilities',
+                                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: colors.text),
+                              ),
+                              Text(
+                                'OS: ${caps?.osName ?? 'unknown'}${caps?.distroId != null ? ' (${caps!.distroId})' : ''}  |  Backend: ${controller.snapshot.backendName}',
+                                style: TextStyle(fontSize: 12, color: colors.textDim),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      TextButton.icon(
-                        onPressed: controller.recheckCapabilities,
-                        icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('Re-check'),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.close, size: 18, color: colors.textDim),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
+                        TextButton.icon(
+                          onPressed: controller.recheckCapabilities,
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Re-check'),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, size: 18, color: colors.textDim),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
+                    child: Scrollbar(
+                      key: const Key('capabilities-scrollbar'),
+                      controller: _scrollController,
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(right: 18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
                           Text(
                             'PREFERENCES',
                             style: TextStyle(
@@ -259,6 +302,7 @@ class CapabilitiesDialog extends StatelessWidget {
                             ],
                         ],
                       ),
+                    ),
                     ),
                   ),
                 ],
@@ -396,7 +440,14 @@ class DiagnosticsDialog extends StatefulWidget {
 }
 
 class _DiagnosticsDialogState extends State<DiagnosticsDialog> {
+  final ScrollController _scrollController = ScrollController();
   LogLevel? _filter;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -473,22 +524,28 @@ class _DiagnosticsDialogState extends State<DiagnosticsDialog> {
                   ),
                   child: entries.isEmpty
                       ? Center(child: Text('No log entries yet.', style: TextStyle(color: colors.textFaint)))
-                      : ListView.builder(
-                          itemCount: entries.length,
-                          itemBuilder: (context, idx) {
-                            return SelectableText(
-                              entries[idx].format(),
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 12,
-                                color: entries[idx].level == LogLevel.error
-                                    ? colors.danger
-                                    : entries[idx].level == LogLevel.warn
-                                        ? colors.warn
-                                        : colors.text,
-                              ),
-                            );
-                          },
+                      : Scrollbar(
+                          controller: _scrollController,
+                          thumbVisibility: true,
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.only(right: 14),
+                            itemCount: entries.length,
+                            itemBuilder: (context, idx) {
+                              return SelectableText(
+                                entries[idx].format(),
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                  color: entries[idx].level == LogLevel.error
+                                      ? colors.danger
+                                      : entries[idx].level == LogLevel.warn
+                                          ? colors.warn
+                                          : colors.text,
+                                ),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ),

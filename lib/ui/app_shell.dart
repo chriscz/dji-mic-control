@@ -93,7 +93,6 @@ class AppShell extends StatelessWidget {
       backgroundColor: colors.bg,
       body: Column(
         children: <Widget>[
-          _buildTopBar(context, colors),
           if (showPermissionBanner)
             InkWell(
               key: const Key('usb-permission-banner'),
@@ -153,16 +152,24 @@ class AppShell extends StatelessWidget {
                   devices: snap.devices,
                   selectedId: snap.selectedId,
                   onSelect: controller.selectDevice,
+                  onToggle: controller.toggleSidebar,
                 ),
                 Expanded(
-                  child: (selectedDevice != null && snap.status != null)
-                      ? DevicePanel(
-                          controller: controller,
-                          device: selectedDevice,
-                          status: snap.status!,
-                          settings: snap.settings,
-                        )
-                      : _buildPlaceholder(context, colors, showPermissionBanner, snap.devices.isNotEmpty),
+                  child: Column(
+                    children: <Widget>[
+                      _buildActionStrip(context, colors),
+                      Expanded(
+                        child: (selectedDevice != null && snap.status != null)
+                            ? DevicePanel(
+                                controller: controller,
+                                device: selectedDevice,
+                                status: snap.status!,
+                                settings: snap.settings,
+                              )
+                            : _buildPlaceholder(context, colors, showPermissionBanner, snap.devices.isNotEmpty),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -172,26 +179,24 @@ class AppShell extends StatelessWidget {
     );
   }
 
-  Widget _buildTopBar(BuildContext context, AppColors colors) {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: colors.bgPanel,
-        border: Border(bottom: BorderSide(color: colors.border)),
-      ),
+  /// Slim, borderless inline utility row (avoids stacking a second titlebar
+  /// underneath the native OS window titlebar).
+  Widget _buildActionStrip(BuildContext context, AppColors colors) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 18, 0),
       child: Row(
         children: <Widget>[
-          IconButton(
-            key: const Key('sidebar-toggle-btn'),
-            tooltip: controller.sidebarOpen ? 'Hide sidebar' : 'Show sidebar',
-            icon: Icon(Icons.menu, size: 18, color: colors.textDim),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-            onPressed: controller.toggleSidebar,
-          ),
+          if (!controller.sidebarOpen)
+            IconButton(
+              key: const Key('sidebar-expand-btn'),
+              tooltip: 'Show sidebar',
+              icon: Icon(Icons.menu, size: 18, color: colors.textDim),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+              onPressed: controller.toggleSidebar,
+            ),
           if (controller.isDemo) ...<Widget>[
-            const SizedBox(width: 6),
+            if (!controller.sidebarOpen) const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
@@ -204,22 +209,16 @@ class AppShell extends StatelessWidget {
               ),
             ),
           ],
-          Expanded(
-            child: Center(
-              child: Text(
-                'DJI Mic Control',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colors.textDim),
-              ),
-            ),
-          ),
+          const Spacer(),
           IconButton(
             key: const Key('diagnostics-btn'),
             tooltip: 'Diagnostics log',
             icon: Icon(Icons.terminal_rounded, size: 17, color: colors.textDim),
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
             onPressed: () => _openDiagnostics(context),
           ),
+          const SizedBox(width: 2),
           Stack(
             children: <Widget>[
               IconButton(
@@ -227,13 +226,13 @@ class AppShell extends StatelessWidget {
                 tooltip: 'System & Capabilities',
                 icon: Icon(Icons.tune_rounded, size: 17, color: colors.textDim),
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+                constraints: const BoxConstraints.tightFor(width: 28, height: 28),
                 onPressed: () => _openCapabilities(context),
               ),
               if (controller.hasCapabilityNeedingSetup)
                 Positioned(
-                  right: 5,
-                  top: 5,
+                  right: 4,
+                  top: 4,
                   child: Container(
                     width: 7,
                     height: 7,
@@ -241,14 +240,6 @@ class AppShell extends StatelessWidget {
                   ),
                 ),
             ],
-          ),
-          IconButton(
-            key: const Key('minimize-btn'),
-            tooltip: 'Minimize window',
-            icon: Icon(Icons.minimize_rounded, size: 17, color: colors.textDim),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-            onPressed: controller.minimizeWindow,
           ),
         ],
       ),

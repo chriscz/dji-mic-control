@@ -106,6 +106,18 @@ static void my_application_activate(GApplication* application) {
     gtk_widget_show(GTK_WIDGET(header_bar));
     gtk_header_bar_set_title(header_bar, "DJI Mic Control");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
+
+    // Keep the GNOME header bar compact instead of GTK3's tall default (~46px).
+    GtkCssProvider* css = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(
+        css,
+        "headerbar { min-height: 28px; padding-top: 2px; padding-bottom: 2px; }",
+        -1, nullptr);
+    gtk_style_context_add_provider(
+        gtk_widget_get_style_context(GTK_WIDGET(header_bar)),
+        GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref(css);
+
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
     gtk_window_set_title(window, "DJI Mic Control");

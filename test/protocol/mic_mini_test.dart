@@ -258,6 +258,14 @@ void main() {
       expect(buf, isEmpty);
     });
 
+    test('decodes v2 level push independently per TX without cross-talk', () {
+      const hex = '551e048a5a020000005b03030e00050100000001140502000000014c';
+      final frame = DjiCrc16.append(_hexBytes(hex), DjiCrc16.v2Init, DjiCrc16.v2Residue);
+      final st = model.decode(fresh(), frame)!;
+      expect(st.tx[0]!.level, 0x14);
+      expect(st.tx[1]!.level, 0x4c);
+    });
+
     test('decodes v2 level push and preserves identity/level across status pushes', () {
       final afterIdentity = model.decode(fresh(), _sampleIdentityRxAndTx())!;
       final withLevel = model.decode(afterIdentity, _sampleLevel2Tx())!;

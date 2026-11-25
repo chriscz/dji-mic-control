@@ -92,6 +92,7 @@ class _TrackedDevice {
   DeviceStatus status;
   Dialect? dialect;
   DateTime? lastFrameAt;
+  DateTime? lastLevelDebugLogAt;
   int sequence = 1;
   bool alive = true;
 }
@@ -228,8 +229,21 @@ class DeviceManager {
           }
           final decoded = tracked.model.decode(tracked.status, frame);
           if (decoded != null) {
+            final now = _now();
+            if (logger != null &&
+                logger!.debugEnabled &&
+                frame.length >= 16 &&
+                frame[14] == 0x05 &&
+                (tracked.lastLevelDebugLogAt == null ||
+                    now.difference(tracked.lastLevelDebugLogAt!) >= const Duration(seconds: 1))) {
+              tracked.lastLevelDebugLogAt = now;
+              final hex = frame.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+              logger!.debug(
+                'RX level [$devId] TX1=${decoded.tx[0]?.level} TX2=${decoded.tx[1]?.level} ($hex)',
+              );
+            }
             tracked.status = decoded;
-            tracked.lastFrameAt = _now();
+            tracked.lastFrameAt = now;
             updated = true;
           }
         }

@@ -12,6 +12,7 @@ import 'package:dji_mic_control/protocol/packet.dart';
 import 'package:dji_mic_control/sim/simulated_dji_mic.dart';
 import 'package:dji_mic_control/state/app_services.dart';
 import 'package:dji_mic_control/ui/app_shell.dart';
+import 'package:dji_mic_control/ui/widgets/audio_level_meter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -62,6 +63,12 @@ void main() {
       expect(find.text('+6 dB'), findsOneWidget);
       expect(find.text('DJI Mic Mini (TX1)'), findsOneWidget);
       expect(find.text('DJI Mic Mini 2 (TX2)'), findsOneWidget);
+
+      // Verify TX1 and TX2 audio meters display distinct levels independently.
+      final meters = tester.widgetList<AudioLevelMeter>(find.byType(AudioLevelMeter)).toList();
+      expect(meters, hasLength(2));
+      expect(meters[0].rawLevel, 44);
+      expect(meters[1].rawLevel, 52);
 
       // Voice Tone appears on Mic Mini 2 TX card; tap Bright and verify hardware state.
       await tester.tap(find.text('Bright'));

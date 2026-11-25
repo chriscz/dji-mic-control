@@ -4,6 +4,10 @@ A Linux-first desktop controller for DJI wireless microphones (DJI Mic Mini, DJI
 
 Repository: [chriscz/dji-mic-control](https://github.com/chriscz/dji-mic-control)
 
+## Why Flutter?
+
+This port was developed so we can move to a single, unified language and UI framework (Dart and Flutter) for building cross-platform desktop apps while depending on very little in the way of external libraries: zero third-party pub.dev runtime packages and zero hard-linked OS-specific native plugins.
+
 ## Origin and Attribution
 
 This project is a ground-up Flutter/Dart port of [ShadowBitBasher/DJI-Mic-Control](https://github.com/ShadowBitBasher/DJI-Mic-Control) (`v1.1.0`, commit `9ba7688`), originally written in Rust + Svelte + Tauri and dedicated to the public domain under [The Unlicense](https://unlicense.org).

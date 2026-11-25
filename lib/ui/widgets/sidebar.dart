@@ -18,6 +18,7 @@ class DeviceSidebar extends StatelessWidget {
     required this.selectedId,
     required this.onSelect,
     required this.onToggle,
+    this.tr,
   });
 
   final bool open;
@@ -25,8 +26,11 @@ class DeviceSidebar extends StatelessWidget {
   final String? selectedId;
   final ValueChanged<String?> onSelect;
   final VoidCallback onToggle;
+  final String Function(String key, [Map<String, Object>? params])? tr;
 
   static const double sidebarWidth = 260;
+
+  String _tr(String text) => tr != null ? tr!(text) : text;
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +62,7 @@ class DeviceSidebar extends StatelessWidget {
                       children: <Widget>[
                         Expanded(
                           child: Text(
-                            'DEVICES',
+                            _tr('DEVICES'),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -82,7 +86,7 @@ class DeviceSidebar extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: Text(
-                        'No devices',
+                        _tr('No devices'),
                         style: TextStyle(fontSize: 13, color: colors.textDim),
                       ),
                     )
@@ -99,6 +103,7 @@ class DeviceSidebar extends StatelessWidget {
                             device: dev,
                             active: active,
                             onTap: () => onSelect(dev.id),
+                            tr: tr,
                           );
                         },
                       ),
@@ -118,16 +123,21 @@ class _SidebarDeviceTile extends StatelessWidget {
     required this.device,
     required this.active,
     required this.onTap,
+    this.tr,
   });
 
   final DeviceSummary device;
   final bool active;
   final VoidCallback onTap;
+  final String Function(String key, [Map<String, Object>? params])? tr;
+
+  String _tr(String text) => tr != null ? tr!(text) : text;
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final hasAnyTx = device.tx.any((t) => t != null);
+    final pictoKey = device.mobileReceiver ? 'mobile-rx' : '${device.pictogramKey}-rx';
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -146,7 +156,7 @@ class _SidebarDeviceTile extends StatelessWidget {
           ),
           child: Row(
             children: <Widget>[
-              DevicePicto(assetKey: '${device.pictogramKey}-rx', size: 40),
+              DevicePicto(assetKey: pictoKey, size: 40),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -154,7 +164,7 @@ class _SidebarDeviceTile extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
                     Text(
-                      device.modelName,
+                      _tr(device.modelName),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -199,6 +209,7 @@ class _SidebarDeviceTile extends StatelessWidget {
                                       value: device.tx[i]!.battery,
                                       charging: device.tx[i]!.charging ?? false,
                                       size: 14,
+                                      tr: tr,
                                     ),
                                   ],
                                 ],
@@ -211,7 +222,7 @@ class _SidebarDeviceTile extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Tooltip(
-                message: device.connected ? 'Connected' : 'Connecting...',
+                message: _tr(device.connected ? 'Connected' : 'Connecting...'),
                 child: Container(
                   width: 9,
                   height: 9,

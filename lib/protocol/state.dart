@@ -83,23 +83,29 @@ class TxInfo {
 
 /// Decoded state of the USB-C receiver.
 class RxInfo {
-  const RxInfo({this.serial, this.firmware});
+  const RxInfo({this.productName, this.serial, this.firmware});
 
+  final String? productName;
   final String? serial;
   final Firmware? firmware;
 
-  RxInfo copyWith({String? serial, Firmware? firmware}) {
+  RxInfo copyWith({String? productName, String? serial, Firmware? firmware}) {
     return RxInfo(
+      productName: productName ?? this.productName,
       serial: serial ?? this.serial,
       firmware: firmware ?? this.firmware,
     );
   }
 
   @override
-  bool operator ==(Object other) => other is RxInfo && serial == other.serial && firmware == other.firmware;
+  bool operator ==(Object other) =>
+      other is RxInfo &&
+      productName == other.productName &&
+      serial == other.serial &&
+      firmware == other.firmware;
 
   @override
-  int get hashCode => Object.hash(serial, firmware);
+  int get hashCode => Object.hash(productName, serial, firmware);
 }
 
 /// Model-agnostic snapshot of a connected microphone's telemetry and settings.
@@ -137,6 +143,30 @@ class DeviceStatus {
   final int? gainDial;
 
   int get txCount => tx.where((t) => t != null).length;
+
+  /// The DJI Mic Series Mobile Receiver shares VID/PID 2ca3:4011 and identifies
+  /// itself in RX tag 0x06 as "DJI Mic Mini 2" or "DJI Mic Series Mobile Receiver".
+  bool get isMobileReceiver {
+    final name = rx?.productName;
+    return name == 'DJI Mic Mini 2' || name == 'DJI Mic Series Mobile Receiver';
+  }
+
+  /// Capability check shared by controller and transport before sending writes.
+  String? settingWriteError(String settingId) {
+    if (isMobileReceiver) {
+      if (settingId == 'noise-cancel' ||
+          settingId == 'noise-cancel-power' ||
+          settingId == 'noise-cancel-button') {
+        return 'Use the O/L/H switch on the mobile receiver to change noise cancellation.';
+      }
+      if (settingId == 'auto-off-15m' || settingId == 'camera-power') {
+        return 'This setting is not available on the USB-powered mobile receiver.';
+      }
+    } else if (settingId == 'receiver-gain' || settingId == 'monitoring-gain') {
+      return 'This control requires an identified mobile receiver.';
+    }
+    return null;
+  }
 
   DeviceStatus copyWith({
     String? modelId,

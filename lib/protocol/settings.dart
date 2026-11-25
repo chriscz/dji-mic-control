@@ -6,6 +6,7 @@
 enum SettingKind {
   toggle,
   segmented,
+  range,
 }
 
 /// Addressing mode for a v2 command.

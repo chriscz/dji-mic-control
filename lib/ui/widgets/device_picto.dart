@@ -25,6 +25,13 @@ class DevicePicto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (assetKey == 'mobile-rx') {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(painter: const _MobileRxPainter()),
+      );
+    }
     final path = _knownAssets[assetKey];
     if (path != null) {
       return SizedBox(
@@ -40,6 +47,65 @@ class DevicePicto extends StatelessWidget {
     }
     return _FallbackMicIcon(size: size);
   }
+}
+
+/// Vector pictogram for DJI Mic Series Mobile Receiver, matching upstream PR #4 `mobile-rx.svg`.
+class _MobileRxPainter extends CustomPainter {
+  const _MobileRxPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sx = size.width / 64.0;
+    final sy = size.height / 64.0;
+    canvas.save();
+    canvas.scale(sx, sy);
+
+    // Top USB-C plug.
+    final plugRect = RRect.fromRectAndRadius(const Rect.fromLTWH(25, 3, 14, 16), const Radius.circular(3));
+    canvas.drawRRect(plugRect, Paint()..color = const Color(0xFFB2B9C1));
+    canvas.drawRRect(
+      plugRect,
+      Paint()
+        ..color = const Color(0xFF647182)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+
+    // Main rounded receiver body.
+    final bodyRect = RRect.fromRectAndRadius(const Rect.fromLTWH(7, 18, 50, 30), const Radius.circular(9));
+    canvas.drawRRect(bodyRect, Paint()..color = const Color(0xFFF0F2F4));
+    canvas.drawRRect(
+      bodyRect,
+      Paint()
+        ..color = const Color(0xFF8C98A7)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+
+    // Bottom clip / base.
+    final baseRect = RRect.fromRectAndRadius(const Rect.fromLTWH(23, 47, 18, 7), const Radius.circular(3));
+    canvas.drawRRect(baseRect, Paint()..color = const Color(0xFF344150));
+
+    // Two green status LEDs.
+    final ledPaint = Paint()..color = const Color(0xFF37A16C);
+    canvas.drawCircle(const Offset(17, 28), 2, ledPaint);
+    canvas.drawCircle(const Offset(47, 28), 2, ledPaint);
+
+    // Center slot / O-L-H bar.
+    canvas.drawLine(
+      const Offset(26, 36),
+      const Offset(38, 36),
+      Paint()
+        ..color = const Color(0xFF8090A2)
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round,
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_MobileRxPainter oldDelegate) => false;
 }
 
 class _FallbackMicIcon extends StatelessWidget {

@@ -336,4 +336,109 @@ void main() {
       expect(model.buildCommand(1, Dialect.v1, 'voice-tone', 'rich', tx: 0), isNull);
     });
   });
+
+  group('Mobile receiver support (upstream PR #4)', () {
+    Uint8List sampleMobileIdentity() {
+      const hex =
+          '557e040000000000005b03030000010000000012000b0302444444444444444444'
+          '444444444404000000000637626165386606000000000e444a49204d6963204d69'
+          '6e692032010100000012000b030245454545454545454545454545450401000000'
+          '0661376330313206010000000e444a49204d6963204d696e692032';
+      return DjiCrc16.append(_hexBytes(hex), DjiCrc16.v2Init, DjiCrc16.v2Residue);
+    }
+
+    Uint8List sampleMobileStatusWithGains({
+      int rxGainByte = 0xfa, // -6 dB
+      int monitorGainByte = 0xfc, // -4 dB
+      int txPlus6 = 0x80,
+      int txPlus7 = 0x20,
+    }) {
+      final rxHex = rxGainByte.toRadixString(16).padLeft(2, '0');
+      final monHex = monitorGainByte.toRadixString(16).padLeft(2, '0');
+      final p6 = txPlus6.toRadixString(16).padLeft(2, '0');
+      final p7 = txPlus7.toRadixString(16).padLeft(2, '0');
+      final hex =
+          '555604a65a020000005b030346000300000000202831${rxHex}00000000${monHex}0000'
+          '0000000000000000000000000000010000001c00000002010000001a$p6$p7'
+          '040100780000000000000000000000000000000000000000';
+      return DjiCrc16.append(_hexBytes(hex), DjiCrc16.v2Init, DjiCrc16.v2Residue);
+    }
+
+    test('mobile receiver identity is distinct from transmitter model', () {
+      final standardWithV2Tx = model.decode(fresh(), _sampleIdentityRxAndTxV2Model())!;
+      expect(standardWithV2Tx.rx!.productName, 'DJI Mic Mini');
+      expect(standardWithV2Tx.tx[0]!.productName, 'DJI Mic Mini 2');
+      expect(standardWithV2Tx.isMobileReceiver, isFalse);
+
+      final mobile = model.decode(fresh(), sampleMobileIdentity())!;
+      expect(mobile.rx!.productName, 'DJI Mic Mini 2');
+      expect(mobile.isMobileReceiver, isTrue);
+
+      // RX productName must survive subsequent status heartbeats.
+      final afterStatus = model.decode(mobile, sampleMobileStatusWithGains())!;
+      expect(afterStatus.isMobileReceiver, isTrue);
+    });
+
+    test('mobile gain commands target receiver and validate ranges', () {
+      final rxGain = model.buildCommand(1, Dialect.v2, 'receiver-gain', '-6')!;
+      expect(rxGain[12], 0x00);
+      expect(rxGain[13], 0x00);
+      expect(rxGain[16], 0x39);
+      expect(rxGain[17], 0x00);
+      expect(rxGain[19], 0xfa);
+      expect(model.buildCommand(1, Dialect.v2, 'receiver-gain', '3'), isNull);
+      expect(model.buildCommand(1, Dialect.v1, 'receiver-gain', '0'), isNull);
+
+      final monGain = model.buildCommand(1, Dialect.v2, 'monitoring-gain', '-1')!;
+      expect(monGain[12], 0x00);
+      expect(monGain[13], 0x00);
+      expect(monGain[16], 0x26);
+      expect(monGain[17], 0x00);
+      expect(monGain[19], 0xff);
+      expect(model.buildCommand(1, Dialect.v2, 'monitoring-gain', '13'), isNull);
+    });
+
+    test('mobile gains decode signed values', () {
+      final st = model.decode(fresh(), sampleMobileStatusWithGains(rxGainByte: 0xfa, monitorGainByte: 0xfc))!;
+      expect(st.gainDial, -6);
+      expect(st.settings['receiver-gain'], '-6');
+      expect(st.settings['monitoring-gain'], '-4');
+    });
+
+    test('mobile capabilities block ineffective commands', () {
+      final standard = model.decode(fresh(), _sampleIdentityRxAndTx())!;
+      expect(standard.settingWriteError('noise-cancel'), isNull);
+      expect(standard.settingWriteError('auto-off-15m'), isNull);
+      expect(standard.settingWriteError('receiver-gain'), isNotNull);
+      expect(standard.settingWriteError('monitoring-gain'), isNotNull);
+
+      final mobile = model.decode(fresh(), sampleMobileIdentity())!;
+      expect(mobile.settingWriteError('noise-cancel'), isNotNull);
+      expect(mobile.settingWriteError('noise-cancel-power'), isNotNull);
+      expect(mobile.settingWriteError('noise-cancel-button'), isNotNull);
+      expect(mobile.settingWriteError('auto-off-15m'), isNotNull);
+      expect(mobile.settingWriteError('camera-power'), isNotNull);
+      expect(mobile.settingWriteError('receiver-gain'), isNull);
+      expect(mobile.settingWriteError('monitoring-gain'), isNull);
+    });
+
+    test('mobile noise status uses connected TX bits', () {
+      final mobile = model.decode(fresh(), sampleMobileIdentity())!;
+
+      final off = model.decode(mobile, sampleMobileStatusWithGains(txPlus6: 0x80, txPlus7: 0x20))!;
+      expect(off.ncEnabled, isFalse);
+      expect(off.settings['noise-cancel-power'], 'off');
+      expect(off.settings['noise-cancel'], 'basic');
+
+      final basic = model.decode(mobile, sampleMobileStatusWithGains(txPlus6: 0x80, txPlus7: 0x21))!;
+      expect(basic.ncEnabled, isTrue);
+      expect(basic.settings['noise-cancel-power'], 'on');
+      expect(basic.settings['noise-cancel'], 'basic');
+
+      final strong = model.decode(mobile, sampleMobileStatusWithGains(txPlus6: 0xa0, txPlus7: 0x21))!;
+      expect(strong.ncEnabled, isTrue);
+      expect(strong.settings['noise-cancel-power'], 'on');
+      expect(strong.settings['noise-cancel'], 'strong');
+    });
+  });
 }

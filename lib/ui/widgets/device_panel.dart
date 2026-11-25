@@ -41,18 +41,21 @@ class DevicePanel extends StatelessWidget {
   final List<SettingDefinition> settings;
 
   String? _lockReasonFor(SettingDefinition setting, Map<String, String> values) {
+    if (device.mobileReceiver && _ncGroupIds.contains(setting.id)) {
+      return controller.t('Use the O/L/H switch on the mobile receiver to change noise cancellation.');
+    }
     if (status.protocolVersion == 1 && setting.v1Command == null) {
-      return 'Requires protocol v2, please update your firmware';
+      return controller.t('Requires protocol v2, please update your firmware');
     }
     if (setting.id == 'noise-cancel' && !controller.effectiveNcEnabled) {
-      return 'Turn on "Noise Cancelling" first';
+      return controller.t('Turn on "Noise Cancelling" first');
     }
     for (final otherId in setting.exclusiveWith) {
       final otherVal = values[otherId];
       if (otherVal != null && otherVal != 'off' && otherVal != 'mono') {
         final otherDef = settings.where((s) => s.id == otherId).firstOrNull;
-        final otherLabel = otherDef?.label ?? otherId;
-        return 'Turn off "$otherLabel" first';
+        final otherLabel = controller.t(otherDef?.label ?? otherId);
+        return controller.t('Turn off "{name}" first', <String, Object>{'name': otherLabel});
       }
     }
     return null;
@@ -88,17 +91,18 @@ class DevicePanel extends StatelessWidget {
   Widget _buildHeader(AppColors colors) {
     final connected = status.connected;
     final pillColor = connected ? colors.good : colors.textDim;
+    final rxPicto = device.mobileReceiver ? 'mobile-rx' : '${device.pictogramKey}-rx';
 
     return Row(
       children: <Widget>[
-        DevicePicto(assetKey: '${device.pictogramKey}-rx', size: 54),
+        DevicePicto(assetKey: rxPicto, size: 54),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                device.modelName,
+                controller.t(device.modelName),
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
@@ -135,7 +139,7 @@ class DevicePanel extends StatelessWidget {
               ),
               const SizedBox(width: 7),
               Text(
-                connected ? 'Connected' : 'No signal',
+                controller.t(connected ? 'Connected' : 'No signal'),
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
@@ -199,26 +203,27 @@ class DevicePanel extends StatelessWidget {
         : gain > 0
             ? '+$gain dB'
             : '$gain dB';
+    final rxPicto = device.mobileReceiver ? 'mobile-rx' : '${device.pictogramKey}-rx';
 
     return _StatusCardShell(
       colors: colors,
-      title: 'RECEIVER',
-      trailing: DevicePicto(assetKey: '${device.pictogramKey}-rx', size: 40),
+      title: controller.t('RECEIVER'),
+      trailing: DevicePicto(assetKey: rxPicto, size: 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           if (rx != null) ...<Widget>[
-            _KvRow(label: 'Serial', value: rx.serial ?? 'Unknown'),
+            _KvRow(label: controller.t('Serial'), value: rx.serial ?? controller.t('Unknown')),
             const SizedBox(height: 6),
-            _KvRow(label: 'Firmware', value: rx.firmware?.toString() ?? 'Unknown'),
+            _KvRow(label: controller.t('Firmware'), value: rx.firmware?.toString() ?? controller.t('Unknown')),
           ] else
-            Text('No data', style: TextStyle(fontSize: 13, color: colors.textFaint)),
+            Text(controller.t('No data'), style: TextStyle(fontSize: 13, color: colors.textFaint)),
           if (proto != null) ...<Widget>[
             const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                Text('Protocol', style: TextStyle(fontSize: 12.5, color: colors.textDim)),
+                Text(controller.t('Protocol'), style: TextStyle(fontSize: 12.5, color: colors.textDim)),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
@@ -237,10 +242,14 @@ class DevicePanel extends StatelessWidget {
               ],
             ),
           ],
-          if (gainText != null) ...<Widget>[
+          if (device.mobileReceiver) ...<Widget>[
+            const SizedBox(height: 6),
+            _KvRow(label: controller.t('Power'), value: 'USB'),
+          ],
+          if (gainText != null && !device.mobileReceiver) ...<Widget>[
             const SizedBox(height: 6),
             _KvRow(
-              label: 'Gain',
+              label: controller.t('Gain'),
               value: gainText,
               valueColor: gain == 0 ? colors.warn : colors.text,
             ),
@@ -278,17 +287,18 @@ class DevicePanel extends StatelessWidget {
               value: tx.battery,
               charging: tx.charging ?? false,
               size: 18,
+              tr: controller.t,
             )
           : null,
       trailing: picto,
       child: tx == null
-          ? Text('Disconnected', style: TextStyle(fontSize: 13, color: colors.textFaint))
+          ? Text(controller.t('Disconnected'), style: TextStyle(fontSize: 13, color: colors.textFaint))
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                _KvRow(label: 'Serial', value: tx.serial ?? 'Unknown'),
+                _KvRow(label: controller.t('Serial'), value: tx.serial ?? controller.t('Unknown')),
                 const SizedBox(height: 6),
-                _KvRow(label: 'Firmware', value: tx.firmware?.toString() ?? 'Unknown'),
+                _KvRow(label: controller.t('Firmware'), value: tx.firmware?.toString() ?? controller.t('Unknown')),
                 const SizedBox(height: 10),
                 AudioLevelMeter(rawLevel: tx.level),
                 if (showVoiceTone) ...<Widget>[
@@ -299,6 +309,7 @@ class DevicePanel extends StatelessWidget {
                     compact: true,
                     pending: controller.isTxPending(index),
                     onChanged: (val) => controller.setTxSetting(index, voiceToneSetting.id, val),
+                    tr: controller.t,
                   ),
                 ],
               ],
@@ -311,7 +322,7 @@ class DevicePanel extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: <Widget>[
         Text(
-          'SETTINGS',
+          controller.t('SETTINGS'),
           style: TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.w600,
@@ -322,9 +333,9 @@ class DevicePanel extends StatelessWidget {
         MicSegmentedControl(
           key: const Key('view-mode-switcher'),
           compact: true,
-          options: const <SettingOption>[
-            SettingOption(value: 'compact', label: 'Compact', wire: 0),
-            SettingOption(value: 'list', label: 'List', wire: 1),
+          options: <SettingOption>[
+            SettingOption(value: 'compact', label: controller.t('Compact'), wire: 0),
+            SettingOption(value: 'list', label: controller.t('List'), wire: 1),
           ],
           value: mode.slug,
           onSelected: (slug) => controller.setViewMode(ViewMode.fromSlug(slug)),
@@ -338,6 +349,8 @@ class DevicePanel extends StatelessWidget {
     var addedNc = false;
 
     for (final s in settings) {
+      if (device.mobileReceiver && (s.id == 'auto-off-15m' || s.id == 'camera-power')) continue;
+      if (!device.mobileReceiver && (s.id == 'receiver-gain' || s.id == 'monitoring-gain')) continue;
       if (_txTargetedIds.contains(s.id)) continue;
       if (_ncGroupIds.contains(s.id)) {
         if (!addedNc) {
@@ -420,7 +433,7 @@ class DevicePanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Text(
-            group.name.toUpperCase(),
+            controller.t(group.name).toUpperCase(),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
@@ -490,9 +503,11 @@ class DevicePanel extends StatelessWidget {
           buttonSetting: byId['noise-cancel-button'],
           values: values,
           compact: compact,
+          readOnly: device.mobileReceiver,
           isPending: controller.isPending,
           lockReasonFor: (s) => _lockReasonFor(s, values),
           onChanged: controller.setSetting,
+          tr: controller.t,
         ),
       _SingleSettingItem(:final setting) => SettingControlRow(
           setting: setting,
@@ -501,6 +516,7 @@ class DevicePanel extends StatelessWidget {
           pending: controller.isPending(setting.id),
           lockReason: _lockReasonFor(setting, values),
           onChanged: (v) => controller.setSetting(setting.id, v),
+          tr: controller.t,
         ),
     };
   }
@@ -586,7 +602,13 @@ class _KvRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: <Widget>[
-        Text(label, style: TextStyle(fontSize: 12.5, color: colors.textDim)),
+        Flexible(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12.5, color: colors.textDim),
+          ),
+        ),
         const SizedBox(width: 8),
         Flexible(
           child: Text(

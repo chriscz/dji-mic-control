@@ -82,23 +82,31 @@ Target app directory: `apps/dji-mic-control/` (leveraging the existing Flutter `
   - Parse `gainDial` at offset `22` as signed `int8` dB (`+12`, `+6`, `0`, `-6`, `-12`).
   - Parse per-TX `charging` (`slot[+7] & 0x02 != 0`) and `battery` (`(slot[+7] >> 2) & 0x07`, 1 = full to 7 = critical).
 
-### 3.4 Complete Settings Matrix (13 Settings)
+### 3.4 Complete Settings Matrix (15 Settings)
 
 | Setting ID | UI Label | Group | Kind | v1 Cmd (BE) | v2 Cmd (LE) | v2 Target | Values (wire hex) | Constraints / Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `noise-cancel-power` | Noise Cancelling | Audio | Toggle | Read-only | `0x0038` | `0xffff` | `off: 0x00`, `on: 0x01` | Locked on v1; parent row of composite NC block |
-| `noise-cancel` | Mode (Noise Cancel) | Audio | Enum | `0x031d` | `0x0037` | `0xffff` | `basic: 0x00`, `strong: 0x01` | Locked when `ncEnabled == false`; sub-row 1 |
-| `noise-cancel-button` | Toggle via TX power button | Audio | Toggle | None | `0x000f` | `0xffff` | `off: 0x00`, `on: 0x01` | Locked on v1; sub-row 2 |
+| `noise-cancel-power` | Noise Cancelling | Audio | Toggle | Read-only | `0x0038` | `0xffff` | `off: 0x00`, `on: 0x01` | Locked on v1; read-only on Mobile Receiver (physical O/L/H switch) |
+| `noise-cancel` | Mode (Noise Cancel) | Audio | Enum | `0x031d` | `0x0037` | `0xffff` | `basic: 0x00`, `strong: 0x01` | Locked when `ncEnabled == false`; read-only on Mobile Receiver |
+| `noise-cancel-button` | Toggle via TX power button | Audio | Toggle | None | `0x000f` | `0xffff` | `off: 0x00`, `on: 0x01` | Locked on v1; blocked on Mobile Receiver |
 | `low-cut` | Low Cut | Audio | Toggle | `0x0303` | `0x0003` | `0xffff` | `off: 0x00`, `on: 0x01` | Readable on v2 when >=1 TX connected |
 | `stereo` | Audio Channels | Audio | Enum | `0x0008` | `0x0008` | `0x0000` | `mono: 0x00`, `stereo: 0x02` | Mutually exclusive with `safety-track` |
 | `safety-track` | Safety Track | Audio | Toggle | `0x0021` | `0x0021` | `0x0000` | `off: 0x00`, `on: 0x01` | Mutually exclusive with `stereo` |
 | `clip-limiter` | Clipping Control | Audio | Toggle | `0x001e` | `0x001e` | `0x0000` | `off: 0x00`, `on: 0x01` | |
-| `auto-off-15m` | Auto Off RX (15 min) | Power & Startup | Toggle | `0x0010` | `0x0010` | `0x0000` | `off: 0x00`, `on: 0x01` | |
+| `auto-off-15m` | Auto Off RX (15 min) | Power & Startup | Toggle | `0x0010` | `0x0010` | `0x0000` | `off: 0x00`, `on: 0x01` | Hidden and blocked on Mobile Receiver |
 | `tx-auto-off-15m` | Auto Off TX (15 min) | Power & Startup | Toggle | None | `0x0010` | `0xffff` | `off: 0x00`, `on: 0x01` | Locked on v1; readable when >=1 TX connected |
-| `camera-power` | RX On/Off follows Camera | Power & Startup | Toggle | `0x0020` | `0x0020` | `0x0000` | `off: 0x00`, `on: 0x01` | |
+| `camera-power` | RX On/Off follows Camera | Power & Startup | Toggle | `0x0020` | `0x0020` | `0x0000` | `off: 0x00`, `on: 0x01` | Hidden and blocked on Mobile Receiver |
 | `plug-free` | Plug-Free Ext. Speaker | Device | Toggle | `0x0023` | `0x0023` | `0x0000` | `off: 0x00`, `on: 0x01` | Note: "Changing this reboots the receiver." USB drops & re-enumerates |
 | `mic-leds` | Mic LEDs | Device | Toggle | `0x030a` | `0x000a` | `0xffff` | `off: 0x02`, `on: 0x00` | Inverted wire values & status bit |
 | `voice-tone` | Voice Tone | Audio (TX card) | Enum | None | `0x0029` | `0x0001`/`0x0002` | `standard: 0x00`, `rich: 0x01`, `bright: 0x02` | Rendered per-TX on Mic Mini 2 TX cards only (v2) |
+| `receiver-gain` | Receiver Gain | Audio | Range | None | `0x0039` | `0x0000` | `-12/-6/0/6/12` dB (signed int8) | Mobile Receiver only; waits up to 3s for reported confirmation |
+| `monitoring-gain` | Monitoring Gain | Audio | Range | None | `0x0026` | `0x0000` | `-12..+12` dB (signed int8) | Mobile Receiver only; waits up to 3s for reported confirmation |
+
+### 3.5 Upstream PR Parity (PR #3 and PR #4)
+
+- **Mobile Receiver (PR #4):** Identifies the DJI Mic Series Mobile Receiver via RX TLV tag `0x06` unit `0` (`"DJI Mic Mini 2"` or `"DJI Mic Series Mobile Receiver"`), renders the dedicated `mobile-rx` vector pictogram and `Power: USB` row, exposes `receiver-gain` and `monitoring-gain` sliders with non-optimistic 3-second confirmation, decodes NC from the connected TX slot, renders `NoiseCancelControl` read-only, and blocks unsupported writes (`noise-cancel*`, `auto-off-15m`, `camera-power`).
+- **Localization (PR #3):** Persisted `en` / `zh-CN` language switcher in Preferences (`AppStrings`) with English fallback.
+- **Diagnostics Fold and Pending Operations:** Collapsible bottom Diagnostics fold showing live `TX` / `TX OK (Nms)` / `TX FAIL` / `Confirmed` events, paired with a hideable Pending Operations status strip.
 
 ---
 

@@ -246,5 +246,66 @@ void main() {
       controller.dispose();
       await tester.runAsync(() => services.deviceManager.dispose());
     });
+
+    testWidgets('renders Mobile Receiver with gain sliders, read-only NC, Power USB, and zh-CN switch', (tester) async {
+      await setDesktopSurface(tester);
+
+      final mobileMic = SimulatedDjiMic(
+        serial: 'MOBILERX000001',
+        dialect: Dialect.v2,
+        rxProductName: 'DJI Mic Mini 2',
+        gainDial: -6,
+        monitoringGain: 3,
+        tx1: const SimulatedTxConfig(
+          serial: 'MOBILETX100001',
+          productName: 'DJI Mic Mini 2',
+          battery: 3,
+          level: 36,
+        ),
+      );
+      final services = AppServices.simulated(
+        transport: SimulatedUsbTransport([mobileMic]),
+      );
+      final controller = await bootstrap(services, startPolling: false);
+      mobileMic.emitAll();
+
+      await tester.pumpWidget(DjiMicApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      // Mobile receiver identity, USB power row, read-only NC, and gain sliders.
+      expect(find.text('DJI Mic Series Mobile Receiver'), findsWidgets);
+      expect(find.text('Power'), findsOneWidget);
+      expect(find.text('USB'), findsOneWidget);
+      expect(find.byKey(const Key('mobile-nc-readonly')), findsOneWidget);
+      expect(find.byKey(const Key('setting-range-receiver-gain')), findsOneWidget);
+      expect(find.byKey(const Key('setting-range-monitoring-gain')), findsOneWidget);
+      expect(find.text('Auto Off RX (15 min)'), findsNothing);
+      expect(find.text('RX On/Off follows Camera'), findsNothing);
+
+      // Update gain via controller and confirm hardware state updates.
+      await controller.setSetting('receiver-gain', '6');
+      await tester.pumpAndSettle();
+      expect(mobileMic.gainDial, 6);
+
+      await controller.setSetting('monitoring-gain', '-4');
+      await tester.pumpAndSettle();
+      expect(mobileMic.monitoringGain, -4);
+
+      // Switch language to Simplified Chinese in Preferences modal.
+      await tester.tap(find.byKey(const Key('capabilities-btn')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('简体中文'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.close).last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('设置'), findsOneWidget);
+      expect(find.text('接收器增益'), findsOneWidget);
+      expect(find.text('监听增益'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+      await tester.runAsync(() => services.deviceManager.dispose());
+    });
   });
 }

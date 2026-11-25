@@ -14,11 +14,13 @@ class BatteryIcon extends StatefulWidget {
     required this.value,
     this.charging = false,
     this.size = 20,
+    this.tr,
   });
 
   final int? value;
   final bool charging;
   final double size;
+  final String Function(String key, [Map<String, Object>? params])? tr;
 
   static String labelFor(int value) {
     if (value == 1) return 'Fully Charged';
@@ -81,7 +83,12 @@ class _BatteryIconState extends State<BatteryIcon> with SingleTickerProviderStat
         : val == 5
             ? colors.warn
             : colors.danger;
-    final tooltip = 'Battery: ${BatteryIcon.labelFor(val)}${widget.charging ? ' (charging)' : ''}';
+    final rawLabel = BatteryIcon.labelFor(val);
+    final label = widget.tr != null ? widget.tr!(rawLabel) : rawLabel;
+    final tooltipKey = widget.charging ? 'Battery: {label} (charging)' : 'Battery: {label}';
+    final tooltip = widget.tr != null
+        ? widget.tr!(tooltipKey, <String, Object>{'label': label})
+        : 'Battery: $label${widget.charging ? ' (charging)' : ''}';
     final width = widget.size * 1.45;
     final height = widget.size * 0.78;
 

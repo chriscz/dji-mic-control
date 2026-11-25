@@ -75,7 +75,7 @@ class _UsbSetupDialogState extends State<UsbSetupDialog> {
                         children: <Widget>[
                           Expanded(
                             child: Text(
-                              'Enable USB access',
+                              controller.t('Enable USB access'),
                               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: colors.text),
                             ),
                           ),
@@ -246,7 +246,7 @@ class _CapabilitiesDialogState extends State<CapabilitiesDialog> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               Text(
-                                'System & Capabilities',
+                                controller.t('System & Capabilities'),
                                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: colors.text),
                               ),
                               Text(
@@ -281,7 +281,7 @@ class _CapabilitiesDialogState extends State<CapabilitiesDialog> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
                           Text(
-                            'PREFERENCES',
+                            controller.t('PREFERENCES'),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -302,13 +302,30 @@ class _CapabilitiesDialogState extends State<CapabilitiesDialog> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: <Widget>[
-                                    Text('Appearance', style: TextStyle(fontSize: 13, color: colors.text)),
+                                    Text(controller.t('Language'), style: TextStyle(fontSize: 13, color: colors.text)),
                                     MicSegmentedControl(
+                                      key: const Key('locale-switcher'),
                                       compact: true,
                                       options: const <SettingOption>[
-                                        SettingOption(value: 'system', label: 'System', wire: 0),
-                                        SettingOption(value: 'light', label: 'Light', wire: 1),
-                                        SettingOption(value: 'dark', label: 'Dark', wire: 2),
+                                        SettingOption(value: 'en', label: 'English', wire: 0),
+                                        SettingOption(value: 'zh-CN', label: '简体中文', wire: 1),
+                                      ],
+                                      value: cfg.locale,
+                                      onSelected: controller.setLocale,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: <Widget>[
+                                    Text(controller.t('Appearance'), style: TextStyle(fontSize: 13, color: colors.text)),
+                                    MicSegmentedControl(
+                                      compact: true,
+                                      options: <SettingOption>[
+                                        SettingOption(value: 'system', label: controller.t('System'), wire: 0),
+                                        SettingOption(value: 'light', label: controller.t('Light'), wire: 1),
+                                        SettingOption(value: 'dark', label: controller.t('Dark'), wire: 2),
                                       ],
                                       value: cfg.themeMode.slug,
                                       onSelected: (v) => controller.setThemePreference(AppThemePreference.fromSlug(v)),

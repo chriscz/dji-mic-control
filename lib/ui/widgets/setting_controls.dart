@@ -144,6 +144,7 @@ class SettingControlRow extends StatelessWidget {
     this.pending = false,
     this.lockReason,
     this.overrideLabel,
+    this.tr,
   });
 
   final SettingDefinition setting;
@@ -154,13 +155,22 @@ class SettingControlRow extends StatelessWidget {
   final bool pending;
   final String? lockReason;
   final String? overrideLabel;
+  final String Function(String key, [Map<String, Object>? params])? tr;
 
   bool get _locked => lockReason != null;
+
+  String _tr(String text) => tr != null ? tr!(text) : text;
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
-    final label = overrideLabel ?? setting.label;
+    final label = _tr(overrideLabel ?? setting.label);
+    final translatedNote = setting.note != null ? _tr(setting.note!) : null;
+    final localizedOptions = tr == null
+        ? setting.options
+        : setting.options
+            .map((o) => SettingOption(value: o.value, label: _tr(o.label), wire: o.wire))
+            .toList(growable: false);
 
     final Widget control;
     if (value == null) {
@@ -171,6 +181,14 @@ class SettingControlRow extends StatelessWidget {
           fontWeight: FontWeight.w500,
           fontSize: 13,
         ),
+      );
+    } else if (setting.kind == SettingKind.range && setting.options.length >= 2) {
+      control = _GainRangeControl(
+        key: Key('setting-range-${setting.id}'),
+        setting: setting,
+        value: value!,
+        disabled: _locked || pending,
+        onChanged: onChanged,
       );
     } else if (setting.kind == SettingKind.toggle && setting.options.length == 2) {
       final isOn = value == setting.options[1].value;
@@ -190,7 +208,7 @@ class SettingControlRow extends StatelessWidget {
     } else {
       control = MicSegmentedControl(
         key: Key('setting-seg-${setting.id}'),
-        options: setting.options,
+        options: localizedOptions,
         value: value,
         compact: compact || subRow,
         disabled: _locked || pending,
@@ -222,19 +240,19 @@ class SettingControlRow extends StatelessWidget {
                 child: Icon(Icons.lock_outline, size: 14, color: colors.textFaint),
               ),
             ],
-            if (compact && setting.note != null) ...<Widget>[
+            if (compact && translatedNote != null) ...<Widget>[
               const SizedBox(width: 6),
               Tooltip(
-                message: setting.note!,
+                message: translatedNote,
                 child: Icon(Icons.warning_amber_rounded, size: 15, color: colors.warn),
               ),
             ],
           ],
         ),
-        if (!compact && setting.note != null) ...<Widget>[
+        if (!compact && translatedNote != null) ...<Widget>[
           const SizedBox(height: 2),
           Text(
-            setting.note!,
+            translatedNote,
             style: TextStyle(fontSize: 12, color: colors.warn),
           ),
         ],
@@ -249,7 +267,8 @@ class SettingControlRow extends StatelessWidget {
       ),
     );
 
-    final bool stackVertically = compact && setting.options.length >= 3;
+    final bool stackVertically = compact &&
+        (setting.kind == SettingKind.range || setting.options.length >= 3);
     final Widget rowContent = stackVertically
         ? Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,6 +294,89 @@ class SettingControlRow extends StatelessWidget {
   }
 }
 
+class _GainRangeControl extends StatefulWidget {
+  const _GainRangeControl({
+    super.key,
+    required this.setting,
+    required this.value,
+    required this.disabled,
+    required this.onChanged,
+  });
+
+  final SettingDefinition setting;
+  final String value;
+  final bool disabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_GainRangeControl> createState() => _GainRangeControlState();
+}
+
+class _GainRangeControlState extends State<_GainRangeControl> {
+  double? _draggingValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final minVal = double.tryParse(widget.setting.options.first.value) ?? -12;
+    final maxVal = double.tryParse(widget.setting.options.last.value) ?? 12;
+    final divisions = widget.setting.options.length - 1;
+    final reported = (double.tryParse(widget.value) ?? 0).clamp(minVal, maxVal);
+    final display = _draggingValue ?? reported;
+    final displayInt = display.round();
+    final readout = displayInt > 0 ? '+$displayInt dB' : '$displayInt dB';
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        SizedBox(
+          width: 132,
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              activeTrackColor: colors.accent,
+              inactiveTrackColor: colors.borderStrong,
+              thumbColor: colors.accent,
+            ),
+            child: Slider(
+              min: minVal,
+              max: maxVal,
+              divisions: divisions > 0 ? divisions : null,
+              value: display,
+              onChanged: widget.disabled ? null : (v) => setState(() => _draggingValue = v),
+              onChangeEnd: widget.disabled
+                  ? null
+                  : (v) {
+                      final snapped = v.round().toString();
+                      setState(() => _draggingValue = null);
+                      if (snapped != widget.value) {
+                        widget.onChanged(snapped);
+                      }
+                    },
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: 50,
+          child: Text(
+            readout,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: colors.text,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Composite 3-setting Noise Cancelling block matching upstream `NoiseCancelControl.svelte`.
 class NoiseCancelControl extends StatelessWidget {
   const NoiseCancelControl({
@@ -287,6 +389,8 @@ class NoiseCancelControl extends StatelessWidget {
     required this.lockReasonFor,
     required this.onChanged,
     this.compact = false,
+    this.readOnly = false,
+    this.tr,
   });
 
   final SettingDefinition? powerSetting;
@@ -297,10 +401,68 @@ class NoiseCancelControl extends StatelessWidget {
   final String? Function(SettingDefinition setting) lockReasonFor;
   final void Function(String id, String value) onChanged;
   final bool compact;
+  final bool readOnly;
+  final String Function(String key, [Map<String, Object>? params])? tr;
+
+  String _tr(String text) => tr != null ? tr!(text) : text;
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
+    if (readOnly) {
+      final powerVal = powerSetting != null ? values[powerSetting!.id] : null;
+      final modeVal = modeSetting != null ? values[modeSetting!.id] : null;
+      final String statusText;
+      if (powerVal == null) {
+        statusText = '--';
+      } else if (powerVal != 'on') {
+        statusText = _tr('Off');
+      } else {
+        final modeLabel = modeSetting?.options
+            .where((o) => o.value == modeVal)
+            .map((o) => o.label)
+            .firstOrNull;
+        statusText = _tr(modeLabel ?? 'Unknown');
+      }
+
+      return Column(
+        key: const Key('mobile-nc-readonly'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  _tr('Noise Cancelling'),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: compact ? 13 : 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: colors.text,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: colors.textDim,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _tr('Use the O/L/H switch on the mobile receiver to change noise cancellation.'),
+            style: TextStyle(fontSize: 12, color: colors.textDim, height: 1.4),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -313,6 +475,7 @@ class NoiseCancelControl extends StatelessWidget {
             pending: isPending(powerSetting!.id),
             lockReason: lockReasonFor(powerSetting!),
             onChanged: (v) => onChanged(powerSetting!.id, v),
+            tr: tr,
           ),
         if (modeSetting != null || buttonSetting != null)
           Padding(
@@ -336,6 +499,7 @@ class NoiseCancelControl extends StatelessWidget {
                       pending: isPending(modeSetting!.id),
                       lockReason: lockReasonFor(modeSetting!),
                       onChanged: (v) => onChanged(modeSetting!.id, v),
+                      tr: tr,
                     ),
                   if (modeSetting != null && buttonSetting != null) const SizedBox(height: 8),
                   if (buttonSetting != null)
@@ -347,6 +511,7 @@ class NoiseCancelControl extends StatelessWidget {
                       pending: isPending(buttonSetting!.id),
                       lockReason: lockReasonFor(buttonSetting!),
                       onChanged: (v) => onChanged(buttonSetting!.id, v),
+                      tr: tr,
                     ),
                 ],
               ),

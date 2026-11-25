@@ -60,7 +60,9 @@ class SimulatedDjiMic {
     this.deviceAddress = 7,
     this.dialect = Dialect.v2,
     this.rxFirmware = const Firmware(2, 3, 17, 0),
+    this.rxProductName = 'DJI Mic Mini',
     this.gainDial = 0,
+    this.monitoringGain = 0,
     SimulatedTxConfig? tx1,
     SimulatedTxConfig? tx2,
     this.permissionDenied = false,
@@ -76,7 +78,9 @@ class SimulatedDjiMic {
   int deviceAddress;
   Dialect dialect;
   Firmware rxFirmware;
+  String rxProductName;
   int gainDial;
+  int monitoringGain;
   final List<SimulatedTxState?> tx = <SimulatedTxState?>[null, null];
 
   bool permissionDenied;
@@ -217,6 +221,7 @@ class SimulatedDjiMic {
         (cameraPower ? 0x80 : 0x00);
     body[21] = (autoOffRx ? 0x01 : 0x00) | (stereo ? 0x04 : 0x00);
     body[22] = gainDial & 0xff;
+    body[27] = monitoringGain & 0xff;
     body[44] = (tx[0] != null ? 0x01 : 0x00) | (tx[1] != null ? 0x02 : 0x00);
     body[48] = (plugFree ? 0x02 : 0x00) |
         (clipLimiter ? 0x10 : 0x00) |
@@ -266,7 +271,7 @@ class SimulatedDjiMic {
       ]);
     }
 
-    addUnit(0, rxFirmware, serial, 'DJI Mic Mini');
+    addUnit(0, rxFirmware, serial, rxProductName);
     for (var i = 0; i < 2; i++) {
       final slot = tx[i];
       if (slot != null) {
@@ -404,6 +409,10 @@ class SimulatedDjiMic {
             _ => 'standard',
           };
         }
+      case 0x0039:
+        gainDial = val.toSigned(8);
+      case 0x0026:
+        monitoringGain = val.toSigned(8);
     }
     return false;
   }

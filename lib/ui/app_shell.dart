@@ -148,6 +148,7 @@ class AppShell extends StatelessWidget {
                   selectedId: snap.selectedId,
                   onSelect: controller.selectDevice,
                   onToggle: controller.toggleSidebar,
+                  tr: controller.t,
                 ),
                 Expanded(
                   child: Column(
@@ -267,7 +268,7 @@ class AppShell extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Text(
-                  'No device selected',
+                  controller.t('No device selected'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: colors.text),
                 ),
@@ -300,7 +301,7 @@ class AppShell extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                permissionIssue ? 'Permission needed' : 'No microphone connected',
+                controller.t(permissionIssue ? 'Permission needed' : 'No microphone connected'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600, color: colors.text),
               ),

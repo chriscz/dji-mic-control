@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../l10n/app_strings.dart';
 import '../platform/capabilities.dart';
 import '../platform/config_store.dart';
 import '../platform/notifier.dart';
@@ -61,6 +62,7 @@ class MicController extends ChangeNotifier {
   UdevInstallResult? _udevInstallResult;
 
   final Map<String, String> _optimistic = <String, String>{};
+  final Map<String, String> _confirmingGain = <String, String>{};
   final Map<String, Timer> _optimisticTimers = <String, Timer>{};
   final Set<String> _pending = <String>{};
 
@@ -91,6 +93,9 @@ class MicController extends ChangeNotifier {
   UdevInstallResult? get udevInstallResult => _udevInstallResult;
   bool get canInstallUdevInApp => services.udevInstaller.supportedOnPlatform;
   List<PendingOperation> get pendingOperations => List<PendingOperation>.unmodifiable(_pendingOps.values);
+
+  /// Translate a UI string according to the persisted locale (`en` or `zh-CN`).
+  String t(String key, [Map<String, Object>? params]) => AppStrings.tr(_config.locale, key, params);
 
   bool isPending(String settingId) => _pending.contains(settingId);
   bool isTxPending(int txIndex) => _pendingTx.contains(txIndex);
@@ -292,10 +297,16 @@ class MicController extends ChangeNotifier {
     return settingId;
   }
 
+  static const Set<String> _gainConfirmIds = <String>{
+    'receiver-gain',
+    'monitoring-gain',
+  };
+
   Future<void> setSetting(String settingId, String value) async {
     final devId = _selectedId;
     if (devId == null || _pending.contains(settingId)) return;
 
+    final confirmGain = _gainConfirmIds.contains(settingId);
     _error = null;
     _pending.add(settingId);
     final label = _labelForSetting(settingId);
@@ -306,12 +317,22 @@ class MicController extends ChangeNotifier {
       stage: 'Sending',
       startedAt: _now(),
     );
-    _optimistic[settingId] = value;
+    if (confirmGain) {
+      // Upstream PR #4: do not show an optimistic value for gain sliders; wait
+      // up to 3s for the receiver's reported heartbeat to confirm the change.
+      _confirmingGain[settingId] = value;
+    } else {
+      _optimistic[settingId] = value;
+    }
     _optimisticTimers.remove(settingId)?.cancel();
     _optimisticTimers[settingId] = Timer(optimisticTimeout, () {
       _optimistic.remove(settingId);
+      final timedOutGain = _confirmingGain.remove(settingId);
       _optimisticTimers.remove(settingId);
       _pendingOps.remove(settingId);
+      if (timedOutGain != null) {
+        _error = t('The receiver did not confirm the gain change. The displayed value is the reported value.');
+      }
       _safeNotify();
     });
 
@@ -322,7 +343,7 @@ class MicController extends ChangeNotifier {
 
     try {
       await services.deviceManager.setSetting(devId, settingId, value);
-      if (_optimistic.containsKey(settingId)) {
+      if (_optimistic.containsKey(settingId) || _confirmingGain.containsKey(settingId)) {
         _pendingOps[settingId] = PendingOperation(
           key: settingId,
           label: label,
@@ -333,6 +354,7 @@ class MicController extends ChangeNotifier {
       }
     } catch (e) {
       _optimistic.remove(settingId);
+      _confirmingGain.remove(settingId);
       _optimisticTimers.remove(settingId)?.cancel();
       _pendingOps.remove(settingId);
       _error = e.toString();
@@ -434,6 +456,19 @@ class MicController extends ChangeNotifier {
       services.logger.info('Confirmed $k=${confirmed[k]}');
     }
 
+    final doneGainKeys = <String>[];
+    _confirmingGain.forEach((k, v) {
+      if (confirmed[k] == v) {
+        doneGainKeys.add(k);
+      }
+    });
+    for (final k in doneGainKeys) {
+      _confirmingGain.remove(k);
+      _optimisticTimers.remove(k)?.cancel();
+      _pendingOps.remove(k);
+      services.logger.info('Confirmed $k=${confirmed[k]}');
+    }
+
     final doneTx = <int>[];
     _optimisticVoiceTone.forEach((idx, v) {
       if (idx >= 0 && idx < status.tx.length && status.tx[idx]?.voiceTone == v) {
@@ -524,6 +559,7 @@ class MicController extends ChangeNotifier {
     }
     _optimisticTimers.clear();
     _optimistic.clear();
+    _confirmingGain.clear();
     for (final t in _optimisticTxTimers.values) {
       t.cancel();
     }

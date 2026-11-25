@@ -42,6 +42,7 @@ class DeviceSummary {
     required this.modelId,
     required this.modelName,
     required this.pictogramKey,
+    this.mobileReceiver = false,
     required this.connected,
     this.rxSerial,
     required this.tx,
@@ -51,6 +52,7 @@ class DeviceSummary {
   final String modelId;
   final String modelName;
   final String pictogramKey;
+  final bool mobileReceiver;
   final bool connected;
   final String? rxSerial;
   final List<TxInfo?> tx;
@@ -264,12 +266,14 @@ class DeviceManager {
       final tracked = _devices[id]!;
       if (!tracked.alive) continue;
       final live = _isLive(tracked);
+      final mobile = tracked.status.isMobileReceiver;
       summaries.add(
         DeviceSummary(
           id: id,
           modelId: tracked.model.id,
-          modelName: tracked.model.name,
+          modelName: mobile ? 'DJI Mic Series Mobile Receiver' : tracked.model.name,
           pictogramKey: tracked.model.pictogramKey,
+          mobileReceiver: mobile,
           connected: live,
           rxSerial: tracked.status.rx?.serial,
           tx: tracked.status.tx,
@@ -322,6 +326,11 @@ class DeviceManager {
     final dialect = tracked.dialect;
     if (dialect == null) {
       throw const UnsupportedSettingException('Waiting for device handshake before changing settings');
+    }
+
+    final blockedReason = tracked.status.settingWriteError(settingId);
+    if (blockedReason != null) {
+      throw UnsupportedSettingException(blockedReason);
     }
 
     final seq = tracked.sequence;

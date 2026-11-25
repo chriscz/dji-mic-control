@@ -118,7 +118,7 @@ class _DiagnosticsFoldState extends State<DiagnosticsFold> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'Diagnostics',
+                            controller.t('Diagnostics'),
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.text),
                           ),
                           const SizedBox(width: 8),

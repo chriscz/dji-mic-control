@@ -47,6 +47,42 @@ class MicMiniModel extends DeviceModel {
     SettingOption(value: 'bright', label: 'Bright', wire: 0x02),
   ];
 
+  static const List<SettingOption> _rxGainOpts = <SettingOption>[
+    SettingOption(value: '-12', label: '-12 dB', wire: 0xf4),
+    SettingOption(value: '-6', label: '-6 dB', wire: 0xfa),
+    SettingOption(value: '0', label: '0 dB', wire: 0x00),
+    SettingOption(value: '6', label: '+6 dB', wire: 0x06),
+    SettingOption(value: '12', label: '+12 dB', wire: 0x0c),
+  ];
+
+  static const List<SettingOption> _monitorGainOpts = <SettingOption>[
+    SettingOption(value: '-12', label: '-12 dB', wire: 0xf4),
+    SettingOption(value: '-11', label: '-11 dB', wire: 0xf5),
+    SettingOption(value: '-10', label: '-10 dB', wire: 0xf6),
+    SettingOption(value: '-9', label: '-9 dB', wire: 0xf7),
+    SettingOption(value: '-8', label: '-8 dB', wire: 0xf8),
+    SettingOption(value: '-7', label: '-7 dB', wire: 0xf9),
+    SettingOption(value: '-6', label: '-6 dB', wire: 0xfa),
+    SettingOption(value: '-5', label: '-5 dB', wire: 0xfb),
+    SettingOption(value: '-4', label: '-4 dB', wire: 0xfc),
+    SettingOption(value: '-3', label: '-3 dB', wire: 0xfd),
+    SettingOption(value: '-2', label: '-2 dB', wire: 0xfe),
+    SettingOption(value: '-1', label: '-1 dB', wire: 0xff),
+    SettingOption(value: '0', label: '0 dB', wire: 0x00),
+    SettingOption(value: '1', label: '+1 dB', wire: 0x01),
+    SettingOption(value: '2', label: '+2 dB', wire: 0x02),
+    SettingOption(value: '3', label: '+3 dB', wire: 0x03),
+    SettingOption(value: '4', label: '+4 dB', wire: 0x04),
+    SettingOption(value: '5', label: '+5 dB', wire: 0x05),
+    SettingOption(value: '6', label: '+6 dB', wire: 0x06),
+    SettingOption(value: '7', label: '+7 dB', wire: 0x07),
+    SettingOption(value: '8', label: '+8 dB', wire: 0x08),
+    SettingOption(value: '9', label: '+9 dB', wire: 0x09),
+    SettingOption(value: '10', label: '+10 dB', wire: 0x0a),
+    SettingOption(value: '11', label: '+11 dB', wire: 0x0b),
+    SettingOption(value: '12', label: '+12 dB', wire: 0x0c),
+  ];
+
   static const String groupAudio = 'Audio';
   static const String groupPower = 'Power & Startup';
   static const String groupDevice = 'Device';
@@ -184,6 +220,26 @@ class MicMiniModel extends DeviceModel {
       v2Command: 0x0029,
       v2Target: _targetTxOne,
       options: _voiceToneOpts,
+    ),
+    SettingDefinition(
+      id: 'receiver-gain',
+      label: 'Receiver Gain',
+      group: groupAudio,
+      kind: SettingKind.range,
+      v1Command: null,
+      v2Command: 0x0039,
+      v2Target: _targetRx,
+      options: _rxGainOpts,
+    ),
+    SettingDefinition(
+      id: 'monitoring-gain',
+      label: 'Monitoring Gain',
+      group: groupAudio,
+      kind: SettingKind.range,
+      v1Command: null,
+      v2Command: 0x0026,
+      v2Target: _targetRx,
+      options: _monitorGainOpts,
     ),
   ];
 
@@ -375,9 +431,27 @@ class MicMiniModel extends DeviceModel {
       );
     }
 
+    final rx = previous.rx ?? const RxInfo();
+    final mobile = rx.productName == 'DJI Mic Mini 2' || rx.productName == 'DJI Mic Series Mobile Receiver';
+
+    // On the mobile receiver the physical O/L/H switch is reflected in the
+    // first connected TX slot's +7 bit 0x01 (enabled) and +6 bit 0x20 (strong).
+    (bool enabled, bool strong)? mobileNc;
+    if (mobile) {
+      for (var slotPos = 0; slotPos < txCount; slotPos++) {
+        final slotOff = _v2HeaderLen + _v2TxSlotLen * slotPos;
+        final unit = f[slotOff + 1];
+        if ((unit == 1 || unit == 2) && (connectedMask & (1 << (unit - 1))) != 0) {
+          mobileNc = ((f[slotOff + 7] & 0x01) != 0, (f[slotOff + 6] & 0x20) != 0);
+          break;
+        }
+      }
+    }
+
+    final monitoringGain = f[27].toSigned(8);
     final map = <String, String>{
-      'noise-cancel': (flags1 & 0x08) != 0 ? 'strong' : 'basic',
-      'noise-cancel-power': _onOff((flags1 & 0x20) != 0),
+      'receiver-gain': gainDial.toString(),
+      'monitoring-gain': monitoringGain.toString(),
       'camera-power': _onOff((flags1 & 0x80) != 0),
       'auto-off-15m': _onOff((flags2 & 0x01) != 0),
       'stereo': (flags2 & 0x04) != 0 ? 'stereo' : 'mono',
@@ -385,6 +459,15 @@ class MicMiniModel extends DeviceModel {
       'clip-limiter': _onOff((flags3 & 0x10) != 0),
       'safety-track': _onOff((flags3 & 0x40) != 0),
     };
+    if (mobile) {
+      if (mobileNc != null) {
+        map['noise-cancel'] = mobileNc.$2 ? 'strong' : 'basic';
+        map['noise-cancel-power'] = _onOff(mobileNc.$1);
+      }
+    } else {
+      map['noise-cancel'] = (flags1 & 0x08) != 0 ? 'strong' : 'basic';
+      map['noise-cancel-power'] = _onOff((flags1 & 0x20) != 0);
+    }
     if (txFlags != null) {
       map['mic-leds'] = (txFlags & 0x02) != 0 ? 'off' : 'on';
       map['tx-auto-off-15m'] = _onOff((txFlags & 0x10) != 0);
@@ -397,9 +480,9 @@ class MicMiniModel extends DeviceModel {
     return DeviceStatus(
       modelId: modelId,
       connected: true,
-      ncEnabled: (flags1 & 0x20) != 0,
+      ncEnabled: mobile ? (mobileNc?.$1 ?? false) : (flags1 & 0x20) != 0,
       tx: txSlots,
-      rx: previous.rx ?? const RxInfo(),
+      rx: rx,
       settings: map,
       gainDial: gainDial,
     );
@@ -443,6 +526,11 @@ class MicMiniModel extends DeviceModel {
         final slotIdx = index - 1;
         txSlots[slotIdx] = (txSlots[slotIdx] ?? const TxInfo()).copyWith(
           level: f[dataStart],
+        );
+        matched = true;
+      } else if (tag == 0x06 && index == 0) {
+        rx = (rx ?? const RxInfo()).copyWith(
+          productName: _readAsciiField(f, dataStart, dataEnd),
         );
         matched = true;
       } else if (tag == 0x06 && (index == 1 || index == 2)) {
